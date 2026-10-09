@@ -1,7 +1,13 @@
-import { Link2, Loader2, Pencil, Plus, RefreshCw, Trash2, Upload, Wand2 } from 'lucide-react'
+/**
+ * Updated PostsEditor with sync integration
+ * Manual sync + auto-fill + sync status display
+ */
+
+import { Link2, Loader2, Pencil, Plus, RefreshCw, Trash2, Upload, Wand2, Clock } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { PostThumb } from '@/components/ui'
 import { formatNum, metricLabel, parsePostUrl, platformLabel, platformMetrics, platforms, postTitle } from '@/lib/platform'
+import { syncPostsFromLinks } from '@/lib/syncHelpers'
 import type { FetchedStats } from '@/lib/statsFetch'
 import { newId, updateData, useSiteData } from '@/lib/store'
 import type { Platform, Post, PostKind, Stats } from '@/lib/types'
@@ -81,6 +87,14 @@ export function PostsEditor() {
       else updateData((d) => ({ ...d, posts: d.posts.map((x) => (x.id === p.id ? applyStats(x, r) : x)) }))
       setSync({ done: i + 1, total: targets.length, failed })
     }
+    // Update lastSyncedAt after all syncs
+    updateData((d) => ({
+      ...d,
+      settings: {
+        ...d.settings,
+        lastSyncedAt: new Date().toISOString(),
+      },
+    }))
   }
   const syncing = !!sync && sync.done < sync.total
 
@@ -91,19 +105,30 @@ export function PostsEditor() {
       title="Posts"
       action={
         <div className="flex flex-wrap justify-end gap-2">
-        <SmallBtn onClick={refreshAll} disabled={syncing || !list.length}>
-          {syncing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />} Update numbers for all {list.length} posts
-        </SmallBtn>
-        <SmallBtn tone="gold" onClick={() => setEditing(blankPost(campaign || data.campaigns[0]?.id || '', section === 'media' ? 'media' : 'lisa'))}>
-          <Plus className="size-4" /> Add post
-        </SmallBtn>
+          <SmallBtn onClick={refreshAll} disabled={syncing || !list.length}>
+            {syncing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />} Update numbers for all {list.length} posts
+          </SmallBtn>
+          <SmallBtn tone="gold" onClick={() => setEditing(blankPost(campaign || data.campaigns[0]?.id || '', section === 'media' ? 'media' : 'lisa'))}>
+            <Plus className="size-4" /> Add post
+          </SmallBtn>
         </div>
       }
     >
       {sync && (
         <p className="mb-4 rounded-2xl border border-gold-200 bg-gold-50/70 px-4 py-2 text-sm text-gold-800">
-          {syncing ? `Updating numbers… ${sync.done} / ${sync.total}` : `Updated ${sync.total - sync.failed} of ${sync.total} posts from their links.`}
-          {sync.failed > 0 && !syncing && ` ${sync.failed} couldn't be read right now — try again later or type those numbers in.`}
+          <span className="inline-flex items-center gap-1.5">
+            <Clock className="size-3.5" />
+            {syncing ? (
+              `Updating numbers… ${sync.done} / ${sync.total}`
+            ) : (
+              <>
+                Updated <strong>{sync.total - sync.failed}</strong> of <strong>{sync.total}</strong> posts from their links.
+              </>
+            )}
+          </span>
+          {sync.failed > 0 && !syncing && (
+            <> {sync.failed} couldn't be read right now — try again later or type those numbers in.</>
+          )}
           {!syncing && ' Instagram keeps saves, shares and reposts private, so those keep the numbers you entered.'}
         </p>
       )}
@@ -118,7 +143,9 @@ export function PostsEditor() {
         <select value={campaign} onChange={(e) => setCampaign(e.target.value)} className={`${inputCls} w-auto`}>
           <option value="">All campaigns</option>
           {data.campaigns.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
           ))}
         </select>
       </div>
@@ -135,8 +162,12 @@ export function PostsEditor() {
                 {p.kind !== 'media' && ` · goal ${formatNum(p.commentGoal)}`}
               </p>
             </div>
-            <SmallBtn onClick={() => setEditing(p)}><Pencil className="size-3.5" /> Edit</SmallBtn>
-            <ConfirmButton onConfirm={() => remove(p.id)} message="Delete this post? This cannot be undone."><Trash2 className="size-3.5" /> Delete post</ConfirmButton>
+            <SmallBtn onClick={() => setEditing(p)}>
+              <Pencil className="size-3.5" /> Edit
+            </SmallBtn>
+            <ConfirmButton onConfirm={() => remove(p.id)} message="Delete this post? This cannot be undone.">
+              <Trash2 className="size-3.5" /> Delete post
+            </ConfirmButton>
           </li>
         ))}
       </ul>
@@ -163,10 +194,19 @@ function PostForm({ initial, onSave, onCancel }: { initial: Post; onSave: (p: Po
     const r = await fetchLinkStats(requestUrl, p.kind !== 'media')
     if (requestId !== fillRequest.current || currentUrl.current !== requestUrl) return
     setFilling(false)
-    setP((cur) => cur.url === requestUrl ? applyStats(cur, r) : cur)
+    setP((cur) => (cur.url === requestUrl ? applyStats(cur, r) : cur))
     const got = (Object.keys(r.stats) as (keyof Stats)[]).filter((k) => r.stats[k] !== undefined).map((k) => metricLabel[k])
     const fields = [r.title ? 'post title' : '', r.thumbnail && p.kind !== 'media' ? 'cover' : '', ...got].filter(Boolean)
-    setFillMsg([fields.length ? `Read ${fields.join(', ')} from the link. Existing edits are kept.` : '', r.metadataError, r.error, !r.error && r.missing.length ? `${r.missing.map((key) => metricLabel[key]).join(', ')} aren't public — enter them manually.` : ''].filter(Boolean).join(' '))
+    setFillMsg(
+      [
+        fields.length ? `Read ${fields.join(', ')} from the link. Existing edits are kept.` : '',
+        r.metadataError,
+        r.error,
+        !r.error && r.missing.length ? `${r.missing.map((key) => metricLabel[key]).join(', ')} not available — you can enter those manually.` : '',
+      ]
+        .filter(Boolean)
+        .join(' ')
+    )
   }
 
   // Pasting a new link fills the numbers straight away
@@ -235,7 +275,9 @@ function PostForm({ initial, onSave, onCancel }: { initial: Post; onSave: (p: Po
         <Field label="Platform">
           <select value={p.platform} onChange={(e) => set({ platform: e.target.value as Platform })} className={inputCls}>
             {platforms.map((pl) => (
-              <option key={pl} value={pl}>{platformLabel[pl]}</option>
+              <option key={pl} value={pl}>
+                {platformLabel[pl]}
+              </option>
             ))}
           </select>
         </Field>
@@ -243,7 +285,9 @@ function PostForm({ initial, onSave, onCancel }: { initial: Post; onSave: (p: Po
           <select value={p.campaignId} onChange={(e) => set({ campaignId: e.target.value })} className={inputCls}>
             <option value="">No campaign</option>
             {data.campaigns.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
             ))}
           </select>
         </Field>
@@ -252,7 +296,9 @@ function PostForm({ initial, onSave, onCancel }: { initial: Post; onSave: (p: Po
             <select value={p.tierId ?? ''} onChange={(e) => set({ tierId: e.target.value || undefined })} className={inputCls}>
               <option value="">No tier</option>
               {data.tiers.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
               ))}
             </select>
           </Field>
@@ -264,20 +310,30 @@ function PostForm({ initial, onSave, onCancel }: { initial: Post; onSave: (p: Po
         <Field label="Post title" hint="Auto-filled when the platform exposes a public preview. You can edit it anytime.">
           <input value={p.title ?? ''} onChange={(e) => set({ title: e.target.value })} placeholder={postTitle(p)} className={inputCls} />
         </Field>
-        {p.kind !== 'media' && <div className="md:col-span-2">
-          <Field label="Cover photo" hint="Read automatically from public previews when available. Linked covers do not upload an image file; you can still upload your own.">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="size-20 shrink-0 overflow-hidden rounded-xl border border-gold-200 bg-gold-50">
-                {p.thumbnail ? <img src={p.thumbnail} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-[10px] text-gold-500">No photo</div>}
+        {p.kind !== 'media' && (
+          <div className="md:col-span-2">
+            <Field label="Cover photo" hint="Read automatically from public previews when available. Linked covers do not upload an image file; you can still upload your own.">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="size-20 shrink-0 overflow-hidden rounded-xl border border-gold-200 bg-gold-50">
+                  {p.thumbnail ? (
+                    <img src={p.thumbnail} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="grid h-full place-items-center text-[10px] text-gold-500">No cover</div>
+                  )}
+                </div>
+                <label className={`btn-gold inline-flex cursor-pointer items-center gap-1.5 rounded-full px-4 py-1.5 text-sm ${uploading ? 'pointer-events-none opacity-60' : ''}`}>
+                  {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />} {uploading ? 'Uploading…' : p.thumbnail ? 'Change photo' : 'Upload photo'}
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => onPhoto(e.target.files?.[0])} />
+                </label>
+                {p.thumbnail && (
+                  <SmallBtn tone="danger" onClick={() => set({ thumbnail: undefined })}>
+                    Remove
+                  </SmallBtn>
+                )}
               </div>
-              <label className={`btn-gold inline-flex cursor-pointer items-center gap-1.5 rounded-full px-4 py-1.5 text-sm ${uploading ? 'pointer-events-none opacity-60' : ''}`}>
-                {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />} {uploading ? 'Uploading…' : p.thumbnail ? 'Change photo' : 'Upload photo'}
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => onPhoto(e.target.files?.[0])} />
-              </label>
-              {p.thumbnail && <SmallBtn tone="danger" onClick={() => set({ thumbnail: undefined })}>Remove</SmallBtn>}
-            </div>
-          </Field>
-        </div>}
+            </Field>
+          </div>
+        )}
         <div className="md:col-span-2">
           <Field label="Caption / note">
             <textarea value={p.caption} onChange={(e) => set({ caption: e.target.value })} rows={2} className={inputCls} />
@@ -319,7 +375,9 @@ function PostForm({ initial, onSave, onCancel }: { initial: Post; onSave: (p: Po
         </div>
 
         <div className="md:col-span-2 flex gap-2">
-          <SmallBtn tone="gold" type="submit" disabled={filling || uploading}>Save post</SmallBtn>
+          <SmallBtn tone="gold" type="submit" disabled={filling || uploading}>
+            Save post
+          </SmallBtn>
           <SmallBtn onClick={onCancel}>Cancel</SmallBtn>
         </div>
       </form>
