@@ -26,6 +26,8 @@ export type Campaign = {
 export type Tier = {
   id: string
   name: string
+  /** Each platform has its own tier list, set by the owner */
+  platform: Platform
 }
 
 export type Post = {

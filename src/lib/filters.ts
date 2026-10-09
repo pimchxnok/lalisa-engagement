@@ -1,4 +1,4 @@
-import type { Platform, Post, PostKind } from './types'
+import type { Platform, Post, PostKind, Tier } from './types'
 
 export type ListSearch = {
   campaign?: string
@@ -19,7 +19,12 @@ export function validateListSearch(s: Record<string, unknown>): ListSearch {
 }
 
 /** Posts in the order a list page shows them — also drives next / previous on detail pages */
-export function filterPosts(posts: Post[], section: 'own' | 'media', s: ListSearch, tierOrder: string[] = []) {
+/** Tiers of one platform, in the owner's order */
+export function tiersFor(tiers: Tier[], platform: Platform) {
+  return tiers.filter((t) => t.platform === platform)
+}
+
+export function filterPosts(posts: Post[], section: 'own' | 'media', s: ListSearch, tiers: Tier[] = []) {
   const list = posts.filter(
     (p) =>
       (section === 'media' ? p.kind === 'media' : p.kind !== 'media') &&
@@ -29,8 +34,9 @@ export function filterPosts(posts: Post[], section: 'own' | 'media', s: ListSear
       (!s.tier || p.tierId === s.tier),
   )
   if (section === 'media') {
+    // Rank by position within the post's own platform, so Tier 1 of every platform comes first
     const rank = (p: Post) => {
-      const i = tierOrder.indexOf(p.tierId ?? '')
+      const i = tiersFor(tiers, p.platform).findIndex((t) => t.id === p.tierId)
       return i === -1 ? 99 : i
     }
     list.sort((a, b) => rank(a) - rank(b))
