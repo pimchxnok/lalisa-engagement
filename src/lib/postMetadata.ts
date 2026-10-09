@@ -21,7 +21,7 @@ function safeUrl(url: URL) {
   return url.protocol === 'https:' && !url.username && !url.password && !url.port
 }
 
-function socialPlatform(url: URL): Platform | undefined {
+export function socialPlatform(url: URL): Platform | undefined {
   if (!safeUrl(url)) return undefined
   const host = url.hostname.toLowerCase()
   if (host === 'tiktok.com' || host.endsWith('.tiktok.com')) return 'tiktok'
@@ -92,11 +92,11 @@ async function readBytes(response: Response, limit: number) {
 const readText = async (response: Response) => new TextDecoder().decode(await readBytes(response, 2_000_000))
 
 /** Fetches a TikTok/Instagram page, following redirects only while they stay on those sites */
-async function fetchPage(initial: URL, signal: AbortSignal) {
+export async function fetchPage(initial: URL, signal: AbortSignal, userAgent = CRAWLER_UA) {
   let url = initial
   for (let redirects = 0; redirects < 5; redirects++) {
     if (!socialPlatform(url)) throw new Error('Unsupported redirect')
-    const response = await fetch(url, { redirect: 'manual', signal, headers: { Accept: 'text/html', 'User-Agent': CRAWLER_UA, 'Accept-Language': 'en' } })
+    const response = await fetch(url, { redirect: 'manual', signal, headers: { Accept: 'text/html', 'User-Agent': userAgent, 'Accept-Language': 'en' } })
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location')
       await response.body?.cancel()
@@ -114,7 +114,7 @@ async function fetchPage(initial: URL, signal: AbortSignal) {
 }
 
 /** Follows share links (vt.tiktok.com, tiktok.com/t/…, instagram.com/share/…) to the real post address */
-async function resolveShareLink(initial: URL, signal: AbortSignal) {
+export async function resolveShareLink(initial: URL, signal: AbortSignal) {
   let url = initial
   for (let redirects = 0; redirects < 5; redirects++) {
     if (!socialPlatform(url)) throw new Error('Unsupported redirect')
@@ -128,7 +128,7 @@ async function resolveShareLink(initial: URL, signal: AbortSignal) {
   return url
 }
 
-function readMeta(html: string) {
+export function readMeta(html: string) {
   const meta: Record<string, string> = {}
   for (const tag of html.match(/<meta\b[^>]*>/gi) ?? []) {
     const attributes: Record<string, string> = {}
@@ -141,12 +141,12 @@ function readMeta(html: string) {
   return meta
 }
 
-function tiktokPost(url: URL) {
+export function tiktokPost(url: URL) {
   const match = url.pathname.match(/\/@([^/]+)\/(video|photo)\/(\d+)/)
   return match ? { user: match[1], kind: match[2], id: match[3] } : undefined
 }
 
-function instagramCode(url: URL) {
+export function instagramCode(url: URL) {
   return url.pathname.match(/\/(p|reel|reels|tv)\/([\w-]+)/)?.[2]
 }
 

@@ -6,7 +6,7 @@ import { StorySharePanel } from '@/components/StorySharePanel'
 import { EmptyState, OpenPostLink, StatGrid } from '@/components/ui'
 import { filterPosts, validateListSearch } from '@/lib/filters'
 import { platformLabel, postTitle } from '@/lib/platform'
-import { updateActivity, useActivity, useSiteData } from '@/lib/store'
+import { clearPostHistory, updateActivity, useActivity, useSiteData } from '@/lib/store'
 
 export const Route = createFileRoute('/media/$postId')({
   validateSearch: validateListSearch,
@@ -50,8 +50,13 @@ function MediaDetail() {
           </button>
         </div>
       </div>
-      <CommentComposer post={post} campaign={campaign} allowCaption={false} />
-      {post.platform !== 'tiktok' && <StorySharePanel post={post} campaign={campaign} />}
+      <CommentComposer key={post.id} post={post} campaign={campaign} allowCaption={false} />
+      {post.platform !== 'tiktok' && <StorySharePanel key={post.id} post={post} campaign={campaign} />}
+      <div className="text-right">
+        <button onClick={() => clearPostHistory(post.id)} className="text-xs text-gold-600 hover:text-rose-600">
+          Clear history for this post
+        </button>
+      </div>
       <PostNav list={list} current={post} section="media" search={search} />
     </div>
   )

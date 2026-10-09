@@ -11,7 +11,7 @@ import type { Activity, SiteData } from './types'
 const DATA_KEY = 'lisa-engagement:data:v1'
 const ACTIVITY_KEY = 'lisa-engagement:activity:v1'
 
-const emptyActivity: Activity = { myComments: {}, engaged: {}, shared: {}, usedLines: {} }
+const emptyActivity: Activity = { myComments: {}, engaged: {}, shared: {}, usedLines: {}, storyDrafts: {} }
 
 let data: SiteData = defaultData
 let activity: Activity = emptyActivity
@@ -62,6 +62,12 @@ export function useActivity(): Activity {
   )
 }
 
+/** Current activity outside React, e.g. to restore a saved draft once after hydration */
+export function getActivity(): Activity {
+  load()
+  return activity
+}
+
 export function updateData(fn: (d: SiteData) => SiteData) {
   load()
   data = fn(data)
@@ -74,6 +80,14 @@ export function updateActivity(fn: (a: Activity) => Activity) {
   activity = fn(activity)
   localStorage.setItem(ACTIVITY_KEY, JSON.stringify(activity))
   emit()
+}
+
+/** Forgets this visitor's comment count, engaged/shared ticks and story draft for one post. Used lines stay used. */
+export function clearPostHistory(postId: string) {
+  updateActivity((a) => {
+    const omit = <T>(r: Record<string, T>) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== postId))
+    return { ...a, myComments: omit(a.myComments), engaged: omit(a.engaged), shared: omit(a.shared), storyDrafts: omit(a.storyDrafts) }
+  })
 }
 
 export function replaceData(next: SiteData) {

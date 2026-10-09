@@ -102,4 +102,6 @@ export type Activity = {
   shared: Record<string, boolean>
   /** Generated / custom line ids that were already copied — never served again */
   usedLines: Record<string, true>
+  /** IG Story "Tags to copy" text the visitor edited, per post */
+  storyDrafts: Record<string, string>
 }

@@ -1,8 +1,9 @@
-import { Check, Dices, ExternalLink } from 'lucide-react'
+import { Check, Dices, ExternalLink, Loader2, Sparkles } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { requestAiLine } from '@/lib/aiLine'
 import { pickLine, type PickedLine } from '@/lib/generator'
 import { copyText } from '@/lib/platform'
-import { updateActivity, useActivity, useSiteData } from '@/lib/store'
+import { getActivity, updateActivity, useActivity, useSiteData } from '@/lib/store'
 import type { Campaign, Lang, Post } from '@/lib/types'
 
 export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Campaign }) {
@@ -21,17 +22,63 @@ export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Cam
   const [box, setBox] = useState('')
   const [edited, setEdited] = useState(false)
   const [flash, setFlash] = useState('')
+  const [writing, setWriting] = useState(false)
   const shared = !!activity.shared[post.id]
 
-  function roll() {
-    if (!storyType) return
-    setLine(
-      pickLine({ type: storyType, lang, length: 'short', campaign, customLines: data.customLines, used: activity.usedLines, exclude: line?.id }),
-    )
-    setEdited(false)
+  function toast(msg: string) {
+    setFlash(msg)
+    setTimeout(() => setFlash(''), 1800)
   }
 
-  useEffect(roll, [post.id, lang])
+  function pick() {
+    if (!storyType) return null
+    return pickLine({ type: storyType, lang, length: 'short', campaign, customLines: data.customLines, used: activity.usedLines, exclude: line?.id })
+  }
+
+  function saveDraft(text: string | undefined) {
+    updateActivity((a) => {
+      const { [post.id]: _, ...rest } = a.storyDrafts
+      return { ...a, storyDrafts: text === undefined ? rest : { ...rest, [post.id]: text } }
+    })
+  }
+
+  /** Drops the visitor's typed text so the box follows the caption and chips again */
+  function discardDraft() {
+    setEdited(false)
+    if (getActivity().storyDrafts[post.id] !== undefined) saveDraft(undefined)
+  }
+
+  function roll() {
+    setLine(pick())
+    discardDraft()
+  }
+
+  async function writeWithAi() {
+    if (!storyType || writing) return
+    setWriting(true)
+    try {
+      setLine(
+        await requestAiLine({
+          mode: 'story',
+          lang,
+          length: 'short',
+          typeName: storyType.name,
+          typeDescription: storyType.description,
+          platform: post.platform,
+          campaign,
+          postCaption: post.caption.slice(0, 600),
+          avoid: line ? [line.text] : [],
+        }),
+      )
+      discardDraft()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'The AI writer is busy — try again.')
+    } finally {
+      setWriting(false)
+    }
+  }
+
+  useEffect(() => setLine(pick()), [lang])
   useEffect(() => setOn(Object.fromEntries([...mentions, ...hashtags].map((t) => [t, true]))), [post.id])
 
   // Rebuild the box from caption + selected chips unless the visitor typed in it
@@ -42,11 +89,18 @@ export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Cam
     setBox([m, line?.text, h].filter(Boolean).join('\n'))
   }, [line, on, edited])
 
+  // Restore the visitor's saved text once, after hydration (declared last so it wins over the rebuild above)
+  useEffect(() => {
+    const draft = getActivity().storyDrafts[post.id]
+    if (draft === undefined) return
+    setBox(draft)
+    setEdited(true)
+  }, [])
+
   async function copyAndOpen() {
     await copyText(box)
     if (line) updateActivity((a) => ({ ...a, usedLines: { ...a.usedLines, [line.id]: true } }))
-    setFlash('Tags copied — opening the post…')
-    setTimeout(() => setFlash(''), 1800)
+    toast('Tags copied — opening the post…')
     window.open(post.url, '_blank', 'noopener')
   }
 
@@ -85,11 +139,24 @@ export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Cam
         <div className="mb-2 flex items-center justify-between">
           <p className="text-xs uppercase tracking-[0.2em] text-gold-600">Short caption</p>
           <div className="flex gap-2">
-            <button onClick={() => setLang(lang === 'en' ? 'th' : 'en')} className="rounded-full border border-gold-200 bg-white/50 px-3 py-1 text-xs text-gold-700">
+            <button
+              onClick={() => {
+                setLang(lang === 'en' ? 'th' : 'en')
+                discardDraft()
+              }}
+              className="rounded-full border border-gold-200 bg-white/50 px-3 py-1 text-xs text-gold-700"
+            >
               {lang === 'en' ? 'EN → TH' : 'TH → EN'}
             </button>
             <button onClick={roll} className="inline-flex items-center gap-1 rounded-full btn-gold px-3 py-1 text-xs">
               <Dices className="size-3.5" /> Random
+            </button>
+            <button
+              onClick={writeWithAi}
+              disabled={writing}
+              className="inline-flex items-center gap-1 rounded-full border border-gold-300 bg-white/70 px-3 py-1 text-xs text-gold-800 hover:bg-white disabled:opacity-60"
+            >
+              {writing ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />} AI write
             </button>
           </div>
         </div>
@@ -105,9 +172,12 @@ export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Cam
         <div className="mb-2 flex items-center justify-between">
           <p className="text-xs uppercase tracking-[0.2em] text-gold-600">Tags to copy</p>
           {edited && (
-            <button onClick={() => setEdited(false)} className="text-xs text-gold-600 hover:text-gold-900">
-              Reset to chips
-            </button>
+            <span className="text-xs text-gold-600">
+              Draft saved ·{' '}
+              <button onClick={discardDraft} className="hover:text-gold-900 underline-offset-2 hover:underline">
+                Reset to chips
+              </button>
+            </span>
           )}
         </div>
         <textarea
@@ -115,6 +185,7 @@ export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Cam
           onChange={(e) => {
             setBox(e.target.value)
             setEdited(true)
+            saveDraft(e.target.value)
           }}
           rows={4}
           className="w-full rounded-2xl border border-dashed border-gold-300 bg-gold-50/60 p-4 text-sm focus:outline-none focus:ring-2 focus:ring-gold-300"

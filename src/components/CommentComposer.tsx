@@ -1,5 +1,6 @@
-import { Check, Copy, Dices, ExternalLink, Languages, RotateCcw, Smartphone } from 'lucide-react'
+import { Check, Copy, Dices, ExternalLink, Languages, Loader2, RotateCcw, Smartphone, Sparkles } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { requestAiLine } from '@/lib/aiLine'
 import { formatForPlatform, pickLine, platformLimits, type PickedLine } from '@/lib/generator'
 import { copyText } from '@/lib/platform'
 import { updateActivity, useActivity, useSiteData } from '@/lib/store'
@@ -27,6 +28,7 @@ export function CommentComposer({ post, campaign, allowCaption }: { post: Post; 
   const [text, setText] = useState('')
   const [tagsOn, setTagsOn] = useState<Record<string, boolean>>({})
   const [flash, setFlash] = useState('')
+  const [writing, setWriting] = useState(false)
 
   const type = types.find((t) => t.id === typeId) ?? types[0]
   const allTags = useMemo(() => [...(campaign?.hashtags ?? []), ...(campaign?.mentions ?? [])], [campaign])
@@ -44,6 +46,30 @@ export function CommentComposer({ post, campaign, allowCaption }: { post: Post; 
     })
     setLine(next)
     setText(next?.text ?? '')
+  }
+
+  async function writeWithAi() {
+    if (!type || writing) return
+    setWriting(true)
+    try {
+      const next = await requestAiLine({
+        mode: 'comment',
+        lang,
+        length,
+        typeName: type.name,
+        typeDescription: type.description,
+        platform: target,
+        campaign,
+        postCaption: post.caption.slice(0, 600),
+        avoid: line ? [line.text] : [],
+      })
+      setLine(next)
+      setText(next.text)
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'The AI writer is busy — try again.')
+    } finally {
+      setWriting(false)
+    }
   }
 
   // New line whenever the recipe changes
@@ -150,19 +176,25 @@ export function CommentComposer({ post, campaign, allowCaption }: { post: Post; 
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            rows={length === 'long' ? 4 : 3}
+            rows={4}
             className={`w-full rounded-2xl border border-gold-200 bg-white/70 p-4 pr-28 text-[15px] leading-relaxed focus:outline-none focus:ring-2 focus:ring-gold-300 ${lang === 'th' ? 'lang-th' : ''}`}
             placeholder="All lines of this type have been used — add more in Owner Studio."
           />
-          <button
-            onClick={roll}
-            className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full btn-gold px-3 py-1.5 text-sm"
-          >
-            <Dices className="size-4" /> Random
-          </button>
+          <div className="absolute right-3 top-3 flex flex-col items-stretch gap-1.5">
+            <button onClick={roll} className="inline-flex items-center gap-1.5 rounded-full btn-gold px-3 py-1.5 text-sm">
+              <Dices className="size-4" /> Random
+            </button>
+            <button
+              onClick={writeWithAi}
+              disabled={writing}
+              className="inline-flex items-center gap-1.5 rounded-full border border-gold-300 bg-white/80 px-3 py-1.5 text-sm text-gold-800 hover:bg-white disabled:opacity-60"
+            >
+              {writing ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} AI write
+            </button>
+          </div>
         </div>
         <p className="mt-1.5 text-xs text-gold-600">
-          {line?.custom ? 'Written by the site owner · ' : ''}Copied lines never appear again for anyone using this device.
+          {line?.custom ? 'Written by the site owner · ' : line?.id.startsWith('a:') ? 'Written by AI just for you · ' : ''}Copied lines never appear again for anyone using this device.
         </p>
       </Step>
 
