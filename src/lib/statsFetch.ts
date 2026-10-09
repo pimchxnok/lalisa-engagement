@@ -178,5 +178,5 @@ async function fetchMetrics(rawUrl: string): Promise<FetchedStats> {
 
 export async function fetchStats(rawUrl: string, includeCover = true): Promise<FetchedStats> {
   const [metrics, metadata] = await Promise.all([fetchMetrics(rawUrl), fetchPostMetadata(rawUrl, includeCover)])
-  return { ...metrics, ...metadata, platform: metadata.platform === 'ig-reel' ? metadata.platform : metrics.platform ?? metadata.platform }
+  return { ...metrics, ...metadata, account: metrics.account ?? metadata.account, platform: metadata.platform === 'ig-reel' ? metadata.platform : metrics.platform ?? metadata.platform }
 }
