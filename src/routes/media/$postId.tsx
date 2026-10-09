@@ -3,7 +3,7 @@ import { Check } from 'lucide-react'
 import { CommentComposer } from '@/components/CommentComposer'
 import { PostNav } from '@/components/PostNav'
 import { StorySharePanel } from '@/components/StorySharePanel'
-import { EmptyState, OpenPostLink, StatGrid } from '@/components/ui'
+import { EmptyState, GoalBar, OpenPostLink, StatGrid } from '@/components/ui'
 import { SyncStatusInfo } from '@/components/SyncStatus'
 import { filterPosts, validateListSearch } from '@/lib/filters'
 import { platformLabel, postTitle } from '@/lib/platform'
@@ -27,6 +27,9 @@ function MediaDetail() {
   const list = filterPosts(data.posts, 'media', { ...search, campaign: search.campaign ?? post.campaignId }, data.tiers.map((t) => t.id))
   const engaged = !!activity.engaged[post.id]
 
+  // For media posts, the "goal" is the current comment count (reflects live/synced data)
+  const mediaGoal = post.stats.comments
+
   return (
     <div className="mx-auto max-w-4xl px-5 pt-10 space-y-6">
       <PostNav list={list} current={post} section="media" search={search} />
@@ -40,8 +43,9 @@ function MediaDetail() {
             <p className="mt-1 text-gold-800/80">{post.caption}</p>
             <OpenPostLink url={post.url}>Open on {platformLabel[post.platform]}</OpenPostLink>
           </div>
-          <SyncStatusInfo>{post.stats.comments.toLocaleString('en-US')} comments</SyncStatusInfo>
+          <SyncStatusInfo>{mediaGoal.toLocaleString('en-US')} comments (updated from platform)</SyncStatusInfo>
           <StatGrid platform={post.platform} stats={post.stats} size="sm" />
+          <GoalBar done={post.stats.comments} goal={mediaGoal} label="Comments on this media post (live count from platform)" />
           <button
             onClick={() => updateActivity((a) => ({ ...a, engaged: { ...a.engaged, [post.id]: !engaged } }))}
             className={`inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium shadow ${
