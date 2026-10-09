@@ -4,6 +4,7 @@ import { CommentComposer } from '@/components/CommentComposer'
 import { PostNav } from '@/components/PostNav'
 import { StorySharePanel } from '@/components/StorySharePanel'
 import { EmptyState, OpenPostLink, StatGrid } from '@/components/ui'
+import { SyncStatusInfo } from '@/components/SyncStatus'
 import { filterPosts, validateListSearch } from '@/lib/filters'
 import { platformLabel, postTitle } from '@/lib/platform'
 import { updateActivity, useActivity, useSiteData } from '@/lib/store'
@@ -39,6 +40,7 @@ function MediaDetail() {
             <p className="mt-1 text-gold-800/80">{post.caption}</p>
             <OpenPostLink url={post.url}>Open on {platformLabel[post.platform]}</OpenPostLink>
           </div>
+          <SyncStatusInfo>{post.stats.comments.toLocaleString('en-US')} comments</SyncStatusInfo>
           <StatGrid platform={post.platform} stats={post.stats} size="sm" />
           <button
             onClick={() => updateActivity((a) => ({ ...a, engaged: { ...a.engaged, [post.id]: !engaged } }))}
