@@ -1,9 +1,14 @@
 
 import type { Platform, Stats } from './types'
+import { fetchPostMetadata } from './postMetadata'
 
 export type FetchedStats = {
   platform?: Platform
   account?: string
+  title?: string
+  caption?: string
+  thumbnail?: string
+  metadataError?: string
   stats: Partial<Stats>
   missing: (keyof Stats)[]
   error?: string
@@ -46,7 +51,7 @@ function isPlatformHost(host: string, platform: 'tiktok' | 'instagram') {
   return hostname === 'instagram.com' || hostname.endsWith('.instagram.com')
 }
 
-export async function fetchStats(rawUrl: string): Promise<FetchedStats> {
+async function fetchMetrics(rawUrl: string): Promise<FetchedStats> {
   let url: URL
 
   try {
@@ -169,4 +174,9 @@ export async function fetchStats(rawUrl: string): Promise<FetchedStats> {
       error: 'Could not reach the stats service. Please try again.',
     }
   }
+}
+
+export async function fetchStats(rawUrl: string, includeCover = true): Promise<FetchedStats> {
+  const [metrics, metadata] = await Promise.all([fetchMetrics(rawUrl), fetchPostMetadata(rawUrl, includeCover)])
+  return { ...metrics, ...metadata, platform: metadata.platform === 'ig-reel' ? metadata.platform : metrics.platform ?? metadata.platform }
 }

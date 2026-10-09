@@ -10,6 +10,10 @@ export const platformLabel: Record<Platform, string> = {
 
 export const platforms: Platform[] = ['tiktok', 'ig-post', 'ig-reel']
 
+export function postTitle(post: Post) {
+  return post.title?.trim() || post.caption.trim().split('\n')[0] || 'Untitled post'
+}
+
 type MetricKey = keyof Stats
 
 export const metricLabel: Record<MetricKey, string> = {
@@ -49,11 +53,11 @@ export function parsePostUrl(raw: string): { platform?: Platform; account?: stri
     const u = new URL(raw.trim())
     const host = u.hostname.replace(/^www\./, '')
     const parts = u.pathname.split('/').filter(Boolean)
-    if (host.endsWith('tiktok.com')) {
+    if (host === 'tiktok.com' || host.endsWith('.tiktok.com')) {
       const handle = parts.find((p) => p.startsWith('@'))
       return { platform: 'tiktok', account: handle }
     }
-    if (host.endsWith('instagram.com')) {
+    if (host === 'instagram.com' || host.endsWith('.instagram.com')) {
       const i = parts.findIndex((p) => ['p', 'reel', 'reels', 'tv'].includes(p))
       const account = i > 0 ? `@${parts[i - 1]}` : undefined
       return { platform: parts[i]?.startsWith('reel') || parts[i] === 'tv' ? 'ig-reel' : 'ig-post', account }

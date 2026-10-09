@@ -5,7 +5,7 @@ import { tipCategories } from '@/lib/platform'
 import { newId, replaceData, resetData, updateData, useSiteData } from '@/lib/store'
 import type { Campaign, Lang, LineStyle, SiteData, TipCategory } from '@/lib/types'
 import { uploadImage } from '@/lib/upload'
-import { ChipInput, Field, inputCls, Panel, SmallBtn } from './fields'
+import { ChipInput, ConfirmButton, Field, inputCls, Panel, SmallBtn } from './fields'
 
 type Key = 'campaigns' | 'tiers' | 'lineTypes' | 'customLines' | 'tips'
 
@@ -14,8 +14,13 @@ function patchItem<K extends Key>(key: K, id: string, patch: Partial<SiteData[K]
 }
 
 function removeItem(key: Key, id: string) {
-  if (!confirm('Delete this item?')) return
-  updateData((d) => ({ ...d, [key]: (d[key] as { id: string }[]).filter((x) => x.id !== id) }))
+  updateData((d) => ({
+    ...d,
+    [key]: (d[key] as { id: string }[]).filter((item) => item.id !== id),
+    ...(key === 'tiers' ? { posts: d.posts.map((post) => post.tierId === id ? { ...post, tierId: undefined } : post) } : {}),
+    ...(key === 'lineTypes' ? { customLines: d.customLines.filter((line) => line.typeId !== id) } : {}),
+    ...(key === 'campaigns' ? { posts: d.posts.map((post) => post.campaignId === id ? { ...post, campaignId: '' } : post) } : {}),
+  }))
 }
 
 function addItem<K extends Key>(key: K, item: SiteData[K][number]) {
@@ -45,7 +50,7 @@ export function CampaignsEditor() {
               </Field>
             </div>
             <div className="md:col-span-3 flex justify-end">
-              <SmallBtn tone="danger" onClick={() => removeItem('campaigns', c.id)}><Trash2 className="size-3.5" /> Delete campaign</SmallBtn>
+              <ConfirmButton onConfirm={() => removeItem('campaigns', c.id)} message="Delete this campaign? Its posts will be kept without a campaign."><Trash2 className="size-3.5" /> Delete campaign</ConfirmButton>
             </div>
           </div>
         ))}
@@ -75,7 +80,7 @@ export function TiersEditor() {
             <span className="w-20 shrink-0 text-xs text-gold-600">{posts.filter((p) => p.tierId === t.id).length} posts</span>
             <SmallBtn onClick={() => move(i, -1)}><ArrowUp className="size-3.5" /></SmallBtn>
             <SmallBtn onClick={() => move(i, 1)}><ArrowDown className="size-3.5" /></SmallBtn>
-            <SmallBtn tone="danger" onClick={() => removeItem('tiers', t.id)}><Trash2 className="size-3.5" /></SmallBtn>
+            <ConfirmButton onConfirm={() => removeItem('tiers', t.id)} message="Delete this tier? Its posts will be kept without a tier."><Trash2 className="size-3.5" /> Delete tier</ConfirmButton>
           </li>
         ))}
       </ul>
@@ -130,7 +135,7 @@ export function LineTypesEditor() {
                 {mine.map((l) => (
                   <li key={l.id} className="flex items-center gap-2">
                     <input value={l.text} onChange={(e) => patchItem('customLines', l.id, { text: e.target.value })} className={`${inputCls} ${lang === 'th' ? 'lang-th' : ''}`} />
-                    <SmallBtn tone="danger" onClick={() => removeItem('customLines', l.id)}><Trash2 className="size-3.5" /></SmallBtn>
+                    <ConfirmButton onConfirm={() => removeItem('customLines', l.id)}><Trash2 className="size-3.5" /> Delete line</ConfirmButton>
                   </li>
                 ))}
               </ul>
@@ -158,7 +163,7 @@ export function LineTypesEditor() {
                 <SmallBtn tone="gold" type="submit"><Plus className="size-4" /> Add</SmallBtn>
               </form>
               <div className="flex justify-end">
-                <SmallBtn tone="danger" onClick={() => removeItem('lineTypes', t.id)}><Trash2 className="size-3.5" /> Delete type</SmallBtn>
+                <ConfirmButton onConfirm={() => removeItem('lineTypes', t.id)} message="Delete this type and its custom lines? This cannot be undone."><Trash2 className="size-3.5" /> Delete type</ConfirmButton>
               </div>
             </div>
           )
@@ -183,7 +188,7 @@ export function TipsEditor() {
             <div className="md:col-span-3"><Field label="Title"><input value={t.title} onChange={(e) => patchItem('tips', t.id, { title: e.target.value })} className={inputCls} /></Field></div>
             <div className="md:col-span-4"><Field label="Text"><textarea rows={3} value={t.body} onChange={(e) => patchItem('tips', t.id, { body: e.target.value })} className={inputCls} /></Field></div>
             <div className="md:col-span-3"><Field label="Link (optional)"><input value={t.link ?? ''} onChange={(e) => patchItem('tips', t.id, { link: e.target.value || undefined })} className={inputCls} /></Field></div>
-            <div className="flex items-end justify-end"><SmallBtn tone="danger" onClick={() => removeItem('tips', t.id)}><Trash2 className="size-3.5" /> Delete</SmallBtn></div>
+            <div className="flex items-end justify-end"><ConfirmButton onConfirm={() => removeItem('tips', t.id)}><Trash2 className="size-3.5" /> Delete tip</ConfirmButton></div>
           </div>
         ))}
       </div>
@@ -254,9 +259,9 @@ export function SiteEditor() {
             <Upload className="size-4" /> Import content
             <input type="file" accept="application/json" className="hidden" onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])} />
           </label>
-          <SmallBtn tone="danger" onClick={() => confirm('Restore the original sample content? Your edits will be lost.') && resetData()}>
+          <ConfirmButton onConfirm={resetData} message="Restore the original sample content? Your edits will be lost.">
             <RotateCcw className="size-4" /> Restore sample content
-          </SmallBtn>
+          </ConfirmButton>
         </div>
       </Panel>
     </div>
