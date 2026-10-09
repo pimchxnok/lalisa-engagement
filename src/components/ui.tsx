@@ -1,5 +1,5 @@
 import { ExternalLink, ImageIcon } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { formatNum, metricLabel, platformLabel, platformMetrics, platforms } from '@/lib/platform'
 import type { Campaign, Platform, Post, Stats } from '@/lib/types'
 
@@ -109,10 +109,11 @@ export function StatGrid({ platform, stats, size = 'md' }: { platform: Platform;
 }
 
 export function PostThumb({ post, className = '' }: { post: Post; className?: string }) {
+  const [failedImage, setFailedImage] = useState<string>()
   return (
     <div className={`relative overflow-hidden rounded-xl bg-gradient-to-br from-gold-100 via-white to-gold-200 ${className}`}>
-      {post.thumbnail ? (
-        <img src={post.thumbnail} alt={post.caption || post.account} referrerPolicy="no-referrer" className="h-full w-full object-cover" loading="lazy" />
+      {post.thumbnail && post.thumbnail !== failedImage ? (
+        <img src={post.thumbnail} alt={post.title || post.caption || 'Post cover'} referrerPolicy="no-referrer" className="h-full w-full object-cover" loading="lazy" onError={() => setFailedImage(post.thumbnail)} />
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-gold-500">
           <ImageIcon className="size-7" strokeWidth={1.3} />
@@ -128,21 +129,23 @@ export function PostThumb({ post, className = '' }: { post: Post; className?: st
 }
 
 export function GoalBar({ done, goal, label }: { done: number; goal: number; label: string }) {
-  const pct = goal > 0 ? Math.min(100, (done / goal) * 100) : 0
+  const pct = goal > 0 ? Math.max(0, Math.min(100, (done / goal) * 100)) : 0
   const reached = goal > 0 && done >= goal
+  const hue = pct <= 50 ? 350 + pct * 1.06 : 43 + (pct - 50) * 2.14
+  const color = `hsl(${hue} 32% 38%)`
   return (
     <div>
       <div className="flex items-center justify-between text-xs mb-1.5">
         <span className="text-gold-700">{label}</span>
-        <span className={`font-medium ${reached ? 'text-emerald-600' : 'text-gold-800'}`}>
+        <span className="font-medium" style={{ color }}>
           {done.toLocaleString('en-US')} / {goal.toLocaleString('en-US')}
-          {reached ? ' · Goal reached ✓' : ` · ${pct.toFixed(0)}%`}
+          {goal <= 0 ? ' · No goal set' : reached ? ' · Goal reached ✓' : ` · ${pct.toFixed(0)}%`}
         </span>
       </div>
-      <div className="h-2 rounded-full bg-gold-100 overflow-hidden">
+      <div className="h-2 rounded-full bg-gold-100 overflow-hidden" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-valuetext={goal > 0 ? `${done} of ${goal}` : 'No goal set'}>
         <div
-          className={`h-full rounded-full transition-all ${reached ? 'bg-emerald-400' : 'bg-gradient-to-r from-gold-300 to-gold-500'}`}
-          style={{ width: `${pct}%` }}
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, background: `linear-gradient(90deg, hsl(${hue} 28% 58%), ${color})` }}
         />
       </div>
     </div>

@@ -79,3 +79,15 @@ export function SmallBtn({ children, onClick, tone = 'plain', type = 'button', d
     </button>
   )
 }
+
+export function ConfirmButton({ children, onConfirm, message = 'Delete this item? This cannot be undone.' }: { children: ReactNode; onConfirm: () => void; message?: string }) {
+  const [pending, setPending] = useState(false)
+  if (!pending) return <SmallBtn tone="danger" onClick={() => setPending(true)}>{children}</SmallBtn>
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-rose-200 bg-rose-50/80 p-2" role="group" aria-label={message}>
+      <span className="text-xs text-rose-800" role="status">{message}</span>
+      <SmallBtn tone="danger" onClick={() => { onConfirm(); setPending(false) }}>Confirm</SmallBtn>
+      <SmallBtn onClick={() => setPending(false)}>Cancel</SmallBtn>
+    </div>
+  )
+}

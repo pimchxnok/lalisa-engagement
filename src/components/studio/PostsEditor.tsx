@@ -1,16 +1,17 @@
 import { Link2, Loader2, Pencil, Plus, RefreshCw, Trash2, Upload, Wand2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { PostThumb } from '@/components/ui'
-import { formatNum, metricLabel, parsePostUrl, platformLabel, platformMetrics, platforms } from '@/lib/platform'
+import { formatNum, metricLabel, parsePostUrl, platformLabel, platformMetrics, platforms, postTitle } from '@/lib/platform'
 import type { FetchedStats } from '@/lib/statsFetch'
 import { newId, updateData, useSiteData } from '@/lib/store'
 import type { Platform, Post, PostKind, Stats } from '@/lib/types'
 import { uploadImage } from '@/lib/upload'
-import { Field, inputCls, Panel, SmallBtn } from './fields'
+import { ConfirmButton, Field, inputCls, Panel, SmallBtn } from './fields'
 
-async function fetchLinkStats(url: string): Promise<FetchedStats> {
+async function fetchLinkStats(url: string, includeCover = true): Promise<FetchedStats> {
   try {
-    const res = await fetch(`/api/stats?url=${encodeURIComponent(url)}`)
+    const res = await fetch(`/api/stats?url=${encodeURIComponent(url)}&cover=${includeCover ? '1' : '0'}`)
+    if (!res.ok) throw new Error('Unavailable')
     return await res.json()
   } catch {
     return { stats: {}, missing: [], error: 'Could not reach the platform — try again.' }
@@ -21,7 +22,15 @@ async function fetchLinkStats(url: string): Promise<FetchedStats> {
 function applyStats(p: Post, r: FetchedStats): Post {
   const stats: Stats = { ...p.stats }
   for (const [k, v] of Object.entries(r.stats) as [keyof Stats, number | undefined][]) if (v !== undefined) stats[k] = v
-  return { ...p, platform: r.platform ?? p.platform, account: p.account || r.account || '', stats }
+  return {
+    ...p,
+    platform: r.platform ?? p.platform,
+    account: p.account || r.account || '',
+    title: p.title || r.title,
+    caption: p.caption || r.caption || '',
+    thumbnail: p.kind === 'media' ? undefined : p.thumbnail || r.thumbnail,
+    stats,
+  }
 }
 
 function blankPost(campaignId: string, kind: PostKind): Post {
@@ -32,6 +41,7 @@ function blankPost(campaignId: string, kind: PostKind): Post {
     platform: 'ig-post',
     url: '',
     account: '',
+    title: '',
     caption: '',
     stats: { views: 0, likes: 0, comments: 0, saves: 0, shares: 0, reposts: 0 },
     commentGoal: kind === 'media' ? undefined : 10_000,
@@ -52,13 +62,12 @@ export function PostsEditor() {
   function save(p: Post) {
     updateData((d) => ({
       ...d,
-      posts: d.posts.some((x) => x.id === p.id) ? d.posts.map((x) => (x.id === p.id ? p : x)) : [p, ...d.posts],
+      posts: d.posts.some((x) => x.id === p.id) ? d.posts.map((x) => (x.id === p.id ? { ...p, thumbnail: p.kind === 'media' ? undefined : p.thumbnail } : x)) : [{ ...p, thumbnail: p.kind === 'media' ? undefined : p.thumbnail }, ...d.posts],
     }))
     setEditing(null)
   }
 
   function remove(id: string) {
-    if (!confirm('Delete this post?')) return
     updateData((d) => ({ ...d, posts: d.posts.filter((p) => p.id !== id) }))
   }
 
@@ -67,7 +76,7 @@ export function PostsEditor() {
     let failed = 0
     setSync({ done: 0, total: targets.length, failed })
     for (const [i, p] of targets.entries()) {
-      const r = await fetchLinkStats(p.url)
+      const r = await fetchLinkStats(p.url, p.kind !== 'media')
       if (r.error) failed++
       else updateData((d) => ({ ...d, posts: d.posts.map((x) => (x.id === p.id ? applyStats(x, r) : x)) }))
       setSync({ done: i + 1, total: targets.length, failed })
@@ -85,7 +94,7 @@ export function PostsEditor() {
         <SmallBtn onClick={refreshAll} disabled={syncing || !list.length}>
           {syncing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />} Update numbers for all {list.length} posts
         </SmallBtn>
-        <SmallBtn tone="gold" onClick={() => setEditing(blankPost(campaign || data.campaigns[0]?.id, section === 'media' ? 'media' : 'lisa'))}>
+        <SmallBtn tone="gold" onClick={() => setEditing(blankPost(campaign || data.campaigns[0]?.id || '', section === 'media' ? 'media' : 'lisa'))}>
           <Plus className="size-4" /> Add post
         </SmallBtn>
         </div>
@@ -116,10 +125,10 @@ export function PostsEditor() {
       <ul className="divide-y divide-gold-200/60">
         {list.map((p) => (
           <li key={p.id} className="flex items-center gap-3 py-3">
-            <PostThumb post={p} className="size-14 shrink-0 [&>span]:hidden" />
+            {p.kind !== 'media' && <PostThumb post={p} className="size-14 shrink-0 [&>span]:hidden" />}
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium text-gold-900">
-                {p.account || 'Untitled'} <span className="text-xs font-normal text-gold-600">· {platformLabel[p.platform]} · {p.kind.toUpperCase()}</span>
+                {postTitle(p)} <span className="text-xs font-normal text-gold-600">· {platformLabel[p.platform]} · {p.kind.toUpperCase()}</span>
               </p>
               <p className="truncate text-xs text-gold-700/80">
                 {formatNum(p.stats.views ?? p.stats.likes)} {p.stats.views !== undefined && p.platform !== 'ig-post' ? 'views' : 'likes'} · {formatNum(p.stats.comments)} comments
@@ -127,7 +136,7 @@ export function PostsEditor() {
               </p>
             </div>
             <SmallBtn onClick={() => setEditing(p)}><Pencil className="size-3.5" /> Edit</SmallBtn>
-            <SmallBtn tone="danger" onClick={() => remove(p.id)}><Trash2 className="size-3.5" /></SmallBtn>
+            <ConfirmButton onConfirm={() => remove(p.id)} message="Delete this post? This cannot be undone."><Trash2 className="size-3.5" /> Delete post</ConfirmButton>
           </li>
         ))}
       </ul>
@@ -149,16 +158,22 @@ function PostForm({ initial, onSave, onCancel }: { initial: Post; onSave: (p: Po
     if (!p.url) return setFillMsg('Paste the post link first.')
     setFilling(true)
     setFillMsg('')
-    const r = await fetchLinkStats(p.url)
+    const requestUrl = p.url
+    const requestId = ++fillRequest.current
+    const r = await fetchLinkStats(requestUrl, p.kind !== 'media')
+    if (requestId !== fillRequest.current || currentUrl.current !== requestUrl) return
     setFilling(false)
-    if (r.error) return setFillMsg(r.error)
-    setP((cur) => applyStats(cur, r))
+    setP((cur) => cur.url === requestUrl ? applyStats(cur, r) : cur)
     const got = (Object.keys(r.stats) as (keyof Stats)[]).filter((k) => r.stats[k] !== undefined).map((k) => metricLabel[k])
-    setFillMsg(`Filled ${got.join(', ') || 'nothing'} from the link.${r.missing.length ? ` ${r.missing.map((k) => metricLabel[k]).join(', ')} aren't public on this platform — type them in.` : ''}`)
+    const fields = [r.title ? 'post title' : '', r.thumbnail && p.kind !== 'media' ? 'cover' : '', ...got].filter(Boolean)
+    setFillMsg([fields.length ? `Read ${fields.join(', ')} from the link. Existing edits are kept.` : '', r.metadataError, r.error, !r.error && r.missing.length ? `${r.missing.map((key) => metricLabel[key]).join(', ')} aren't public — enter them manually.` : ''].filter(Boolean).join(' '))
   }
 
   // Pasting a new link fills the numbers straight away
   const lastFilled = useRef(initial.url)
+  const fillRequest = useRef(0)
+  const currentUrl = useRef(p.url)
+  currentUrl.current = p.url
   useEffect(() => {
     if (!p.url || p.url === lastFilled.current || !parsePostUrl(p.url).platform) return
     const t = setTimeout(() => {
@@ -182,6 +197,9 @@ function PostForm({ initial, onSave, onCancel }: { initial: Post; onSave: (p: Po
   }
 
   function onUrl(url: string) {
+    fillRequest.current++
+    setFilling(false)
+    setFillMsg('')
     const info = parsePostUrl(url)
     const patch: Partial<Post> = { url }
     if (info.platform) patch.platform = info.platform
@@ -200,7 +218,7 @@ function PostForm({ initial, onSave, onCancel }: { initial: Post; onSave: (p: Po
         }}
       >
         <div className="md:col-span-2">
-          <Field label="Post link" hint={detected || 'Paste a TikTok or Instagram link — platform, account and numbers fill in automatically.'}>
+          <Field label="Post link" hint={detected || 'Paste a TikTok or Instagram link to read the post title, public preview and available numbers.'}>
             <div className="relative">
               <Link2 className="absolute left-3 top-2.5 size-4 text-gold-500" />
               <input required value={p.url} onChange={(e) => onUrl(e.target.value)} placeholder="https://www.instagram.com/p/…" className={`${inputCls} pl-9`} />
@@ -223,6 +241,7 @@ function PostForm({ initial, onSave, onCancel }: { initial: Post; onSave: (p: Po
         </Field>
         <Field label="Campaign">
           <select value={p.campaignId} onChange={(e) => set({ campaignId: e.target.value })} className={inputCls}>
+            <option value="">No campaign</option>
             {data.campaigns.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
@@ -242,11 +261,11 @@ function PostForm({ initial, onSave, onCancel }: { initial: Post; onSave: (p: Po
             <input type="number" min={0} value={p.commentGoal ?? 0} onChange={(e) => set({ commentGoal: Number(e.target.value) })} className={inputCls} />
           </Field>
         )}
-        <Field label="Account">
-          <input value={p.account} onChange={(e) => set({ account: e.target.value })} placeholder="@lalalalisa_m" className={inputCls} />
+        <Field label="Post title" hint="Auto-filled when the platform exposes a public preview. You can edit it anytime.">
+          <input value={p.title ?? ''} onChange={(e) => set({ title: e.target.value })} placeholder={postTitle(p)} className={inputCls} />
         </Field>
-        <div className="md:col-span-2">
-          <Field label="Cover photo" hint="Upload a screenshot or photo of the post — it shows on the post card.">
+        {p.kind !== 'media' && <div className="md:col-span-2">
+          <Field label="Cover photo" hint="Read automatically from public previews when available. Linked covers do not upload an image file; you can still upload your own.">
             <div className="flex flex-wrap items-center gap-3">
               <div className="size-20 shrink-0 overflow-hidden rounded-xl border border-gold-200 bg-gold-50">
                 {p.thumbnail ? <img src={p.thumbnail} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-[10px] text-gold-500">No photo</div>}
@@ -258,7 +277,7 @@ function PostForm({ initial, onSave, onCancel }: { initial: Post; onSave: (p: Po
               {p.thumbnail && <SmallBtn tone="danger" onClick={() => set({ thumbnail: undefined })}>Remove</SmallBtn>}
             </div>
           </Field>
-        </div>
+        </div>}
         <div className="md:col-span-2">
           <Field label="Caption / note">
             <textarea value={p.caption} onChange={(e) => set({ caption: e.target.value })} rows={2} className={inputCls} />
@@ -280,7 +299,7 @@ function PostForm({ initial, onSave, onCancel }: { initial: Post; onSave: (p: Po
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-medium text-gold-800">Engagement numbers</p>
             <SmallBtn tone="gold" onClick={autoFill} disabled={filling}>
-              {filling ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />} Auto-fill all numbers from link
+              {filling ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />} Read title, preview & numbers from link
             </SmallBtn>
           </div>
           {fillMsg && <p className="mb-3 text-xs text-gold-700">{fillMsg}</p>}
@@ -300,7 +319,7 @@ function PostForm({ initial, onSave, onCancel }: { initial: Post; onSave: (p: Po
         </div>
 
         <div className="md:col-span-2 flex gap-2">
-          <SmallBtn tone="gold" type="submit">Save post</SmallBtn>
+          <SmallBtn tone="gold" type="submit" disabled={filling || uploading}>Save post</SmallBtn>
           <SmallBtn onClick={onCancel}>Cancel</SmallBtn>
         </div>
       </form>

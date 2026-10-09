@@ -36,6 +36,7 @@ export type Post = {
   url: string
   /** Account that published the post, e.g. @lalalalisa_m or @voguemagazine */
   account: string
+  title?: string
   caption: string
   /** Optional cover image; when empty the card shows a branded placeholder */
   thumbnail?: string
