@@ -1,6 +1,7 @@
 import { Link2, Loader2, Pencil, Plus, RefreshCw, Trash2, Upload, Wand2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { PostThumb } from '@/components/ui'
+import { tiersFor } from '@/lib/filters'
 import { formatNum, metricLabel, parsePostUrl, platformLabel, platformMetrics, platforms, postTitle } from '@/lib/platform'
 import type { FetchedStats } from '@/lib/statsFetch'
 import { newId, updateData, useSiteData } from '@/lib/store'
@@ -152,7 +153,9 @@ function PostForm({ initial, onSave, onCancel }: { initial: Post; onSave: (p: Po
   const [filling, setFilling] = useState(false)
   const [fillMsg, setFillMsg] = useState('')
   const [uploading, setUploading] = useState(false)
-  const set = (patch: Partial<Post>) => setP((cur) => ({ ...cur, ...patch }))
+  // A tier belongs to one platform, so switching platform drops a tier that no longer fits
+  const set = (patch: Partial<Post>) => setP((cur) => fitTier({ ...cur, ...patch }))
+  const fitTier = (x: Post): Post => (x.tierId && data.tiers.find((t) => t.id === x.tierId)?.platform !== x.platform ? { ...x, tierId: undefined } : x)
 
   async function autoFill() {
     if (!p.url) return setFillMsg('Paste the post link first.')
@@ -163,7 +166,7 @@ function PostForm({ initial, onSave, onCancel }: { initial: Post; onSave: (p: Po
     const r = await fetchLinkStats(requestUrl, p.kind !== 'media')
     if (requestId !== fillRequest.current || currentUrl.current !== requestUrl) return
     setFilling(false)
-    setP((cur) => cur.url === requestUrl ? applyStats(cur, r) : cur)
+    setP((cur) => cur.url === requestUrl ? fitTier(applyStats(cur, r)) : cur)
     const got = (Object.keys(r.stats) as (keyof Stats)[]).filter((k) => r.stats[k] !== undefined).map((k) => metricLabel[k])
     const fields = [r.title ? 'post title' : '', r.thumbnail && p.kind !== 'media' ? 'cover' : '', ...got].filter(Boolean)
     setFillMsg([fields.length ? `Read ${fields.join(', ')} from the link. Existing edits are kept.` : '', r.metadataError, r.error, !r.error && r.missing.length ? `${r.missing.map((key) => metricLabel[key]).join(', ')} aren't public — enter them manually.` : ''].filter(Boolean).join(' '))
@@ -204,7 +207,7 @@ function PostForm({ initial, onSave, onCancel }: { initial: Post; onSave: (p: Po
     const patch: Partial<Post> = { url }
     if (info.platform) patch.platform = info.platform
     if (info.account && !p.account) patch.account = info.account
-    setP({ ...p, ...patch })
+    setP(fitTier({ ...p, ...patch }))
     setDetected(info.platform ? `Detected ${platformLabel[info.platform]}${info.account ? ` by ${info.account}` : ''}` : '')
   }
 
@@ -248,10 +251,10 @@ function PostForm({ initial, onSave, onCancel }: { initial: Post; onSave: (p: Po
           </select>
         </Field>
         {p.kind === 'media' ? (
-          <Field label="Tier">
+          <Field label={`${platformLabel[p.platform]} tier`} hint="Tiers are set per platform in Media Tiers.">
             <select value={p.tierId ?? ''} onChange={(e) => set({ tierId: e.target.value || undefined })} className={inputCls}>
               <option value="">No tier</option>
-              {data.tiers.map((t) => (
+              {tiersFor(data.tiers, p.platform).map((t) => (
                 <option key={t.id} value={t.id}>{t.name}</option>
               ))}
             </select>
