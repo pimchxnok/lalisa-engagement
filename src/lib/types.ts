@@ -100,10 +100,12 @@ export type SiteData = {
 export type Activity = {
   /** Comments this visitor has ticked per post */
   myComments: Record<string, number>
-  /** Posts this visitor confirmed they engaged (LISA, Brand and Media) */
+  /** Legacy "liked & engaged" tick per post id; no longer set */
   engaged: Record<string, boolean>
-  /** Media posts this visitor shared to story */
+  /** Legacy story-share tick per post id; moved into `status` on load */
   shared: Record<string, boolean>
+  /** "I commented" / "I shared to Stories" per post, keyed by `engageKey` so a post in both sections shares one status */
+  status: Record<string, { commented?: boolean; shared?: boolean }>
   /** Generated / custom line ids that were already copied — never served again */
   usedLines: Record<string, true>
   /** IG Story "Tags to copy" text the visitor edited, per post */

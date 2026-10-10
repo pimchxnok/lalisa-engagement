@@ -1,11 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { CommentComposer } from '@/components/CommentComposer'
+import { PostEngage } from '@/components/PostEngage'
 import { PostNav } from '@/components/PostNav'
 import { EmptyState, GoalBar, OpenPostLink, PostThumb, StatGrid } from '@/components/ui'
 import { SyncStatusInfo } from '@/components/SyncStatus'
 import { filterPosts, validateListSearch } from '@/lib/filters'
 import { platformLabel, postTitle } from '@/lib/platform'
-import { clearPostHistory, useSiteData } from '@/lib/store'
+import { useSiteData } from '@/lib/store'
 
 export const Route = createFileRoute('/posts/$postId')({
   validateSearch: validateListSearch,
@@ -41,12 +41,7 @@ function PostDetail() {
           <GoalBar done={post.stats.comments} goal={post.commentGoal ?? 0} label="Comments on the post vs. goal" />
         </div>
       </div>
-      <CommentComposer key={post.id} post={post} campaign={campaign} allowCaption />
-      <div className="text-right">
-        <button onClick={() => clearPostHistory(post.id)} className="text-xs text-gold-600 hover:text-rose-600">
-          Clear history for this post
-        </button>
-      </div>
+      <PostEngage key={post.id} post={post} campaign={campaign} allowCaption />
       <PostNav list={list} current={post} section="own" search={search} />
     </div>
   )

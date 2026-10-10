@@ -4,10 +4,12 @@
  */
 
 import { createFileRoute } from '@tanstack/react-router'
+import { EngageResetBar } from '@/components/EngageStatus'
 import { PostCard } from '@/components/PostCard'
 
 import { CampaignPicker, EmptyState, GoalBar, PlatformIcon, PlatformTabs, SectionTitle } from '@/components/ui'
 import { SyncStatusBadge } from '@/components/SyncStatus'
+import { canShareStory, engageStatus } from '@/lib/engagement'
 import { filterPosts, tiersFor, validateListSearch } from '@/lib/filters'
 import { formatNum, metricLabel, platformLabel, platforms, sumStats } from '@/lib/platform'
 import { useActivity, useSiteData } from '@/lib/store'
@@ -37,8 +39,9 @@ function MediaList() {
       season.filter((post) => post.platform === p).length,
     ]),
   ])
-  const engaged = season.filter((post) => activity.engaged[post.id]).length
-  const shared = season.filter((post) => activity.shared[post.id]).length
+  const commented = season.filter((post) => engageStatus(activity, post).commented).length
+  const storyPosts = season.filter(canShareStory)
+  const shared = storyPosts.filter((post) => engageStatus(activity, post).shared).length
   const set = (patch: Partial<typeof s>) =>
     navigate({
       search: { ...s, ...patch },
@@ -101,13 +104,13 @@ function MediaList() {
         </div>
         <div className="glass mt-4 grid gap-4 rounded-3xl p-5 md:grid-cols-2">
           <GoalBar
-            done={engaged}
+            done={commented}
             goal={season.length}
-            label="Reviewed progress · engaged"
+            label="Reviewed progress · commented"
           />
           <GoalBar
             done={shared}
-            goal={season.length}
+            goal={storyPosts.length}
             label="Reviewed progress · shared to story"
           />
         </div>
@@ -165,6 +168,13 @@ function MediaList() {
       >
         Every like, comment and share on these posts counts toward LISA's exposure. Share to your story, like, comment, repost.
       </SectionTitle>
+      <EngageResetBar
+        scopes={[
+          { id: 'shown', label: 'Media posts shown here', posts: list },
+          { id: 'section', label: 'All Media posts', posts: filterPosts(data.posts, 'media', {}) },
+          { id: 'both', label: 'LISA & Brand + Media posts', posts: data.posts },
+        ]}
+      />
       <div className="grid gap-6 md:grid-cols-2">
         {list.map((post) => (
           <PostCard key={post.id} post={post} search={s} />

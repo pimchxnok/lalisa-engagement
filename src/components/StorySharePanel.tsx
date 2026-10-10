@@ -3,6 +3,7 @@ import { Check, ChevronDown, Copy, Dices, ExternalLink, Loader2, Send, Sparkles 
 import { useEffect, useMemo, useState } from 'react'
 import { requestAiLine } from '@/lib/aiLine'
 import { pickLine, type PickedLine } from '@/lib/generator'
+import { engageStatus } from '@/lib/engagement'
 import { copyText } from '@/lib/platform'
 import { getActivity, updateActivity, useActivity, useSiteData } from '@/lib/store'
 import type { Campaign, Lang, Post } from '@/lib/types'
@@ -32,7 +33,7 @@ export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Cam
   const [opened, setOpened] = useState(false)
   const [flash, setFlash] = useState('')
   const [writing, setWriting] = useState(false)
-  const shared = !!activity.shared[post.id]
+  const shared = engageStatus(activity, post).shared
 
   function toast(msg: string) {
     setFlash(msg)
@@ -116,10 +117,6 @@ export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Cam
     if (line) updateActivity((a) => ({ ...a, usedLines: { ...a.usedLines, [line.id]: true } }))
     if (open) setOpened(true)
     toast(open ? 'Caption copied — tap ✈️ → Add to story, then paste' : 'Caption copied')
-  }
-
-  function toggleShared() {
-    updateActivity((a) => ({ ...a, shared: { ...a.shared, [post.id]: !a.shared[post.id] } }))
   }
 
   const Chip = ({ t }: { t: string }) => (
@@ -256,17 +253,11 @@ export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Cam
         </a>
       </div>
 
-      <div className={`flex flex-wrap items-center gap-3 rounded-2xl p-3 ${opened && !shared ? 'bg-emerald-50 ring-1 ring-emerald-200' : ''}`}>
-        <button
-          onClick={toggleShared}
-          className={`inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium shadow ${
-            shared ? 'bg-white text-emerald-700 border border-emerald-300' : 'bg-emerald-500 text-white hover:bg-emerald-600'
-          }`}
-        >
-          <Check className="size-4" /> {shared ? 'Shared — undo' : 'I posted it to my story ✓'}
-        </button>
-        {opened && !shared && <span className="text-sm text-emerald-700">Back from Instagram? Tick it off here.</span>}
-      </div>
+      {opened && !shared && (
+        <p className="rounded-2xl bg-emerald-50 p-3 text-sm text-emerald-700 ring-1 ring-emerald-200">
+          Back from Instagram? Tap <b>I shared to Stories</b> at the bottom of the page.
+        </p>
+      )}
 
       {flash && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-full bg-gold-900/90 px-5 py-2.5 text-sm text-white shadow-lg">
