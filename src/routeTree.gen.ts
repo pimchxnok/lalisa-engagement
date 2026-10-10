@@ -12,6 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StudioRouteImport } from './routes/studio'
 import { Route as TipsRouteImport } from './routes/tips'
+import { Route as ApiContentRouteImport } from './routes/api/content'
+import { Route as ApiLinesRouteImport } from './routes/api/lines'
+import { Route as ApiLiveSyncRouteImport } from './routes/api/live-sync'
 import { Route as ApiStatsRouteImport } from './routes/api/stats'
 import { Route as ApiUploadRouteImport } from './routes/api/upload'
 import { Route as ApiWriteLineRouteImport } from './routes/api/write-line'
@@ -20,6 +23,7 @@ import { Route as MediaPostIdRouteImport } from './routes/media/$postId'
 import { Route as PostsIndexRouteImport } from './routes/posts/index'
 import { Route as PostsPostIdRouteImport } from './routes/posts/$postId'
 import { Route as ApiImagesKeyRouteImport } from './routes/api/images/$key'
+import { Route as ApiSyncManualRouteImport } from './routes/api/sync/manual'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,6 +38,21 @@ const StudioRoute = StudioRouteImport.update({
 const TipsRoute = TipsRouteImport.update({
   id: '/tips',
   path: '/tips',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiContentRoute = ApiContentRouteImport.update({
+  id: '/api/content',
+  path: '/api/content',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLinesRoute = ApiLinesRouteImport.update({
+  id: '/api/lines',
+  path: '/api/lines',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLiveSyncRoute = ApiLiveSyncRouteImport.update({
+  id: '/api/live-sync',
+  path: '/api/live-sync',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiStatsRoute = ApiStatsRouteImport.update({
@@ -76,11 +95,19 @@ const ApiImagesKeyRoute = ApiImagesKeyRouteImport.update({
   path: '/api/images/$key',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSyncManualRoute = ApiSyncManualRouteImport.update({
+  id: '/api/sync/manual',
+  path: '/api/sync/manual',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/studio': typeof StudioRoute
   '/tips': typeof TipsRoute
+  '/api/content': typeof ApiContentRoute
+  '/api/lines': typeof ApiLinesRoute
+  '/api/live-sync': typeof ApiLiveSyncRoute
   '/api/stats': typeof ApiStatsRoute
   '/api/upload': typeof ApiUploadRoute
   '/api/write-line': typeof ApiWriteLineRoute
@@ -89,11 +116,15 @@ export interface FileRoutesByFullPath {
   '/media/': typeof MediaIndexRoute
   '/posts/': typeof PostsIndexRoute
   '/api/images/$key': typeof ApiImagesKeyRoute
+  '/api/sync/manual': typeof ApiSyncManualRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/studio': typeof StudioRoute
   '/tips': typeof TipsRoute
+  '/api/content': typeof ApiContentRoute
+  '/api/lines': typeof ApiLinesRoute
+  '/api/live-sync': typeof ApiLiveSyncRoute
   '/api/stats': typeof ApiStatsRoute
   '/api/upload': typeof ApiUploadRoute
   '/api/write-line': typeof ApiWriteLineRoute
@@ -102,12 +133,16 @@ export interface FileRoutesByTo {
   '/media': typeof MediaIndexRoute
   '/posts': typeof PostsIndexRoute
   '/api/images/$key': typeof ApiImagesKeyRoute
+  '/api/sync/manual': typeof ApiSyncManualRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/studio': typeof StudioRoute
   '/tips': typeof TipsRoute
+  '/api/content': typeof ApiContentRoute
+  '/api/lines': typeof ApiLinesRoute
+  '/api/live-sync': typeof ApiLiveSyncRoute
   '/api/stats': typeof ApiStatsRoute
   '/api/upload': typeof ApiUploadRoute
   '/api/write-line': typeof ApiWriteLineRoute
@@ -116,6 +151,7 @@ export interface FileRoutesById {
   '/media/': typeof MediaIndexRoute
   '/posts/': typeof PostsIndexRoute
   '/api/images/$key': typeof ApiImagesKeyRoute
+  '/api/sync/manual': typeof ApiSyncManualRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -123,6 +159,9 @@ export interface FileRouteTypes {
     | '/'
     | '/studio'
     | '/tips'
+    | '/api/content'
+    | '/api/lines'
+    | '/api/live-sync'
     | '/api/stats'
     | '/api/upload'
     | '/api/write-line'
@@ -131,11 +170,15 @@ export interface FileRouteTypes {
     | '/media/'
     | '/posts/'
     | '/api/images/$key'
+    | '/api/sync/manual'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/studio'
     | '/tips'
+    | '/api/content'
+    | '/api/lines'
+    | '/api/live-sync'
     | '/api/stats'
     | '/api/upload'
     | '/api/write-line'
@@ -144,11 +187,15 @@ export interface FileRouteTypes {
     | '/media'
     | '/posts'
     | '/api/images/$key'
+    | '/api/sync/manual'
   id:
     | '__root__'
     | '/'
     | '/studio'
     | '/tips'
+    | '/api/content'
+    | '/api/lines'
+    | '/api/live-sync'
     | '/api/stats'
     | '/api/upload'
     | '/api/write-line'
@@ -157,12 +204,16 @@ export interface FileRouteTypes {
     | '/media/'
     | '/posts/'
     | '/api/images/$key'
+    | '/api/sync/manual'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   StudioRoute: typeof StudioRoute
   TipsRoute: typeof TipsRoute
+  ApiContentRoute: typeof ApiContentRoute
+  ApiLinesRoute: typeof ApiLinesRoute
+  ApiLiveSyncRoute: typeof ApiLiveSyncRoute
   ApiStatsRoute: typeof ApiStatsRoute
   ApiUploadRoute: typeof ApiUploadRoute
   ApiWriteLineRoute: typeof ApiWriteLineRoute
@@ -171,6 +222,7 @@ export interface RootRouteChildren {
   MediaIndexRoute: typeof MediaIndexRoute
   PostsIndexRoute: typeof PostsIndexRoute
   ApiImagesKeyRoute: typeof ApiImagesKeyRoute
+  ApiSyncManualRoute: typeof ApiSyncManualRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -194,6 +246,27 @@ declare module '@tanstack/react-router' {
       path: '/tips'
       fullPath: '/tips'
       preLoaderRoute: typeof TipsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/content': {
+      id: '/api/content'
+      path: '/api/content'
+      fullPath: '/api/content'
+      preLoaderRoute: typeof ApiContentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lines': {
+      id: '/api/lines'
+      path: '/api/lines'
+      fullPath: '/api/lines'
+      preLoaderRoute: typeof ApiLinesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/live-sync': {
+      id: '/api/live-sync'
+      path: '/api/live-sync'
+      fullPath: '/api/live-sync'
+      preLoaderRoute: typeof ApiLiveSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/stats': {
@@ -252,6 +325,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiImagesKeyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/sync/manual': {
+      id: '/api/sync/manual'
+      path: '/api/sync/manual'
+      fullPath: '/api/sync/manual'
+      preLoaderRoute: typeof ApiSyncManualRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -259,6 +339,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   StudioRoute: StudioRoute,
   TipsRoute: TipsRoute,
+  ApiContentRoute: ApiContentRoute,
+  ApiLinesRoute: ApiLinesRoute,
+  ApiLiveSyncRoute: ApiLiveSyncRoute,
   ApiStatsRoute: ApiStatsRoute,
   ApiUploadRoute: ApiUploadRoute,
   ApiWriteLineRoute: ApiWriteLineRoute,
@@ -267,6 +350,7 @@ const rootRouteChildren: RootRouteChildren = {
   MediaIndexRoute: MediaIndexRoute,
   PostsIndexRoute: PostsIndexRoute,
   ApiImagesKeyRoute: ApiImagesKeyRoute,
+  ApiSyncManualRoute: ApiSyncManualRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
