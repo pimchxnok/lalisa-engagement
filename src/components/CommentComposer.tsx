@@ -229,7 +229,7 @@ export function CommentComposer({ post, campaign, allowCaption }: { post: Post; 
             className={`w-full rounded-2xl border border-gold-200 bg-white/70 p-4 pr-28 text-[15px] leading-relaxed focus:outline-none focus:ring-2 focus:ring-gold-300 ${lang === 'th' ? 'lang-th' : ''}`}
             placeholder={busy ? 'Writing a line for this post…' : 'All lines of this type have been used — add more in Owner Studio.'}
           />
-<          <div className="absolute right-3 top-3 flex flex-col items-stretch gap-1.5">
+          <div className="absolute right-3 top-3 flex flex-col items-stretch gap-1.5">
             <button
               onClick={() => void roll()}
               disabled={writing}
