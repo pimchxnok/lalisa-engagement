@@ -1,10 +1,10 @@
-import { Check, MessageCircle, Send, Undo2 } from 'lucide-react'
+import { Check, MessageCircle, Plus, Send, Undo2 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { CommentComposer } from './CommentComposer'
 import { StorySharePanel } from './StorySharePanel'
 import { EngageRibbon } from './EngageStatus'
 import { canShareStory, engageStatus } from '@/lib/engagement'
-import { markCommented, setEngageStatus, useActivity } from '@/lib/store'
+import { addComment, markCommented, setEngageStatus, useActivity } from '@/lib/store'
 import type { Campaign, Post } from '@/lib/types'
 
 /** Comment / Share to Story tabs plus the one place to save "I commented" and "I shared to Stories" */
@@ -24,9 +24,16 @@ export function PostEngage({ post, campaign, allowCaption }: { post: Post; campa
   }
 
   function commented() {
+    if (status.commented) return
     markCommented(post)
     setRollSignal((n) => n + 1)
     toast('Nice! Comment saved ✓')
+  }
+
+  function commentedAgain() {
+    addComment(post)
+    setRollSignal((n) => n + 1)
+    toast(`+1 · ${mine + 1} comments saved ✓`)
   }
 
   function toggleShared() {
@@ -58,12 +65,22 @@ export function PostEngage({ post, campaign, allowCaption }: { post: Post; campa
           <div className="flex flex-col gap-1">
             <button
               onClick={commented}
+              disabled={status.commented}
+              aria-pressed={status.commented}
               className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium shadow ${
-                status.commented ? 'border border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50' : 'bg-emerald-500 text-white hover:bg-emerald-600'
+                status.commented ? 'cursor-default border border-emerald-300 bg-emerald-50 text-emerald-700' : 'bg-emerald-500 text-white hover:bg-emerald-600'
               }`}
             >
-              <MessageCircle className="size-4" /> {status.commented ? 'Commented ✓ · tap for another' : 'I commented'}
+              {status.commented ? <Check className="size-4" /> : <MessageCircle className="size-4" />} {status.commented ? 'Commented ✓ · saved' : 'I commented'}
             </button>
+            {status.commented && (
+              <button
+                onClick={commentedAgain}
+                className="inline-flex items-center justify-center gap-1.5 rounded-full border border-emerald-300 bg-white px-5 py-2 text-sm font-medium text-emerald-700 shadow-sm hover:bg-emerald-50"
+              >
+                <Plus className="size-4" /> I commented again · +1
+              </button>
+            )}
             <span className="text-center text-xs text-gold-700">
               You’ve commented <b>{mine}</b> {mine === 1 ? 'time' : 'times'} on this post
             </span>

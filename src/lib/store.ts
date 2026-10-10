@@ -169,13 +169,24 @@ export function setEngageStatus(post: Post, patch: Partial<EngageStatus>) {
   updateActivity((a) => ({ ...a, status: { ...a.status, [k]: { ...a.status[k], ...patch } } }))
 }
 
-/** "I commented": marks the comment status and adds one to this visitor's comment count on the post */
+/** "I commented": saves the comment status once and counts that first comment; repeat taps do nothing */
 export function markCommented(post: Post) {
   const k = engageKey(post)
+  updateActivity((a) => {
+    if (a.status[k]?.commented) return a
+    return {
+      ...a,
+      myComments: { ...a.myComments, [post.id]: Math.max(1, a.myComments[post.id] ?? 0) },
+      status: { ...a.status, [k]: { ...a.status[k], commented: true } },
+    }
+  })
+}
+
+/** "+1 commented again": adds one more comment to this visitor's count on an already-ticked post */
+export function addComment(post: Post) {
   updateActivity((a) => ({
     ...a,
     myComments: { ...a.myComments, [post.id]: (a.myComments[post.id] ?? 0) + 1 },
-    status: { ...a.status, [k]: { ...a.status[k], commented: true } },
   }))
 }
 

@@ -3,7 +3,7 @@
  * Manual sync + auto-fill + sync status display
  */
 
-import { Link2, Loader2, Pencil, Plus, RefreshCw, Trash2, Upload, Wand2, Clock } from 'lucide-react'
+import { CheckSquare, Link2, Loader2, Pencil, Plus, RefreshCw, Trash2, Upload, Wand2, Clock } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { PostThumb } from '@/components/ui'
 import { tiersFor } from '@/lib/filters'
@@ -63,8 +63,30 @@ export function PostsEditor() {
   const [campaign, setCampaign] = useState(data.campaigns[0]?.id ?? '')
   const [editing, setEditing] = useState<Post | null>(null)
   const [sync, setSync] = useState<{ done: number; total: number; failed: number } | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const list = data.posts.filter((p) => (section === 'media' ? p.kind === 'media' : p.kind !== 'media') && (!campaign || p.campaignId === campaign))
+  // Only posts visible in the current list can stay selected
+  const picked = list.filter((p) => selected.has(p.id))
+  const allPicked = !!list.length && picked.length === list.length
+
+  // Switching section or campaign starts a fresh selection
+  useEffect(() => setSelected(new Set()), [section, campaign])
+
+  function toggle(id: string) {
+    setSelected((cur) => {
+      const next = new Set(cur)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function removeSelected() {
+    const ids = new Set(picked.map((p) => p.id))
+    updateData((d) => ({ ...d, posts: d.posts.filter((p) => !ids.has(p.id)) }))
+    setSelected(new Set())
+  }
 
   function save(p: Post) {
     updateData((d) => ({
@@ -150,9 +172,39 @@ export function PostsEditor() {
           ))}
         </select>
       </div>
+      {!!list.length && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-gold-200 bg-gold-50/60 px-4 py-2">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gold-800">
+            <input type="checkbox" checked={allPicked} onChange={() => setSelected(allPicked ? new Set() : new Set(list.map((p) => p.id)))} className="size-4 accent-gold-600" />
+            Select all ({list.length})
+          </label>
+          <span className="text-sm text-gold-600">
+            <CheckSquare className="mr-1 inline size-3.5" />
+            {picked.length} selected
+          </span>
+          {picked.length > 0 && (
+            <div className="ml-auto flex gap-2">
+              <SmallBtn onClick={() => setSelected(new Set())}>Clear selection</SmallBtn>
+              <ConfirmButton
+                onConfirm={removeSelected}
+                message={`Delete ${picked.length} selected ${picked.length === 1 ? 'post' : 'posts'}? This cannot be undone.`}
+              >
+                <Trash2 className="size-3.5" /> Delete selected ({picked.length})
+              </ConfirmButton>
+            </div>
+          )}
+        </div>
+      )}
       <ul className="divide-y divide-gold-200/60">
         {list.map((p) => (
-          <li key={p.id} className="flex items-center gap-3 py-3">
+          <li key={p.id} className={`flex items-center gap-3 py-3 ${selected.has(p.id) ? 'bg-gold-50/70' : ''}`}>
+            <input
+              type="checkbox"
+              checked={selected.has(p.id)}
+              onChange={() => toggle(p.id)}
+              aria-label={`Select ${postTitle(p)}`}
+              className="size-4 shrink-0 cursor-pointer accent-gold-600"
+            />
             {p.kind !== 'media' && <PostThumb post={p} className="size-14 shrink-0 [&>span]:hidden" />}
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium text-gold-900">
