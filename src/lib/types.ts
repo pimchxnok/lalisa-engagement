@@ -26,6 +26,8 @@ export type Campaign = {
 export type Tier = {
   id: string
   name: string
+  /** Each platform has its own tier list, set by the owner */
+  platform: Platform
 }
 
 export type Post = {
@@ -47,6 +49,8 @@ export type Post = {
   communityComments: number
   tierId?: string
   postedAt: string
+  /** When the live numbers were last read from the post link (set by the server, never stored) */
+  syncedAt?: string
   /** Extra @ tags the story-share box should include for this post */
   extraMentions?: string[]
 }
@@ -55,7 +59,7 @@ export type LineType = {
   id: string
   name: string
   description: string
-  /** Which built-in phrase bank backs this type when custom lines run out */
+  /** 'story' marks IG Story caption types; any other value is a comment type. Also picks the offline fallback bank. */
   style: LineStyle
 }
 
@@ -96,10 +100,37 @@ export type SiteData = {
 export type Activity = {
   /** Comments this visitor has ticked per post */
   myComments: Record<string, number>
-  /** Media posts this visitor marked as engaged */
+  /** Posts this visitor confirmed they engaged (LISA, Brand and Media) */
   engaged: Record<string, boolean>
   /** Media posts this visitor shared to story */
   shared: Record<string, boolean>
   /** Generated / custom line ids that were already copied — never served again */
   usedLines: Record<string, true>
+  /** Line ids copied on each post, so clearing a post's history frees them again */
+  postLines: Record<string, string[]>
+  /** Where the visitor left off on each post (composer and story box), restored on return */
+  drafts: Record<string, PostDraft>
 }
+
+export type ComposerDraft = {
+  typeId: string
+  lang: Lang
+  length: LineLength
+  mode: 'comment' | 'caption'
+  target: Platform
+  lineId?: string
+  custom?: boolean
+  text: string
+  tagsOn: Record<string, boolean>
+}
+
+export type StoryDraft = {
+  lang: Lang
+  lineId?: string
+  lineText?: string
+  on: Record<string, boolean>
+  box: string
+  edited: boolean
+}
+
+export type PostDraft = { composer?: ComposerDraft; story?: StoryDraft }

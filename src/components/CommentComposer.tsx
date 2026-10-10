@@ -1,8 +1,9 @@
-import { Check, Copy, Dices, ExternalLink, Languages, RotateCcw, Smartphone } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-import { formatForPlatform, pickLine, platformLimits, type PickedLine } from '@/lib/generator'
+import { Check, Copy, Dices, ExternalLink, Languages, Loader2, RotateCcw, Smartphone } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { formatForPlatform, platformLimits, type PickedLine } from '@/lib/generator'
+import { nextLine } from '@/lib/lineWriter'
 import { copyText } from '@/lib/platform'
-import { updateActivity, useActivity, useSiteData } from '@/lib/store'
+import { getActivity, getSiteData, markLineUsed, saveDraft, updateActivity, useActivity, useSiteData } from '@/lib/store'
 import type { Campaign, Lang, LineLength, Platform, Post } from '@/lib/types'
 
 type Mode = 'comment' | 'caption'
@@ -13,6 +14,7 @@ const lengths: { id: LineLength; label: string }[] = [
   { id: 'long', label: 'Long' },
 ]
 
+/** Render with `key={post.id}` so each post starts from its own saved draft */
 export function CommentComposer({ post, campaign, allowCaption }: { post: Post; campaign?: Campaign; allowCaption: boolean }) {
   const data = useSiteData()
   const activity = useActivity()
@@ -26,35 +28,56 @@ export function CommentComposer({ post, campaign, allowCaption }: { post: Post; 
   const [line, setLine] = useState<PickedLine | null>(null)
   const [text, setText] = useState('')
   const [tagsOn, setTagsOn] = useState<Record<string, boolean>>({})
+  const [busy, setBusy] = useState(false)
   const [flash, setFlash] = useState('')
 
   const type = types.find((t) => t.id === typeId) ?? types[0]
   const allTags = useMemo(() => [...(campaign?.hashtags ?? []), ...(campaign?.mentions ?? [])], [campaign])
 
-  function roll() {
+  const recipe = [type?.id, lang, length].join('|')
+  const restored = useRef(false)
+  const lastRecipe = useRef('')
+  const request = useRef(0)
+
+  async function roll() {
     if (!type) return
-    const next = pickLine({
-      type,
-      lang,
-      length,
-      campaign,
-      customLines: data.customLines,
-      used: activity.usedLines,
-      exclude: line?.id,
-    })
+    const n = ++request.current
+    lastRecipe.current = recipe
+    setBusy(true)
+    const next = await nextLine({ type, lang, length, post, campaign, customLines: data.customLines, used: getActivity().usedLines, exclude: line?.id })
+    if (n !== request.current) return
+    setBusy(false)
     setLine(next)
     setText(next?.text ?? '')
   }
 
-  // New line whenever the recipe changes
-  useEffect(roll, [typeId, lang, length, post.id])
+  // Pick up where the visitor left off; otherwise draw a new line whenever the recipe changes
+  useEffect(() => {
+    if (!restored.current) {
+      restored.current = true
+      const d = getActivity().drafts[post.id]?.composer
+      if (d && getSiteData().lineTypes.some((t) => t.id === d.typeId && t.style !== 'story')) {
+        setTypeId(d.typeId)
+        setLang(d.lang)
+        setLength(d.length)
+        setMode(allowCaption ? d.mode : 'comment')
+        setTarget(d.target)
+        setTagsOn(d.tagsOn)
+        setLine(d.lineId ? { id: d.lineId, text: d.text, custom: !!d.custom } : null)
+        setText(d.text)
+        lastRecipe.current = [d.typeId, d.lang, d.length].join('|')
+        return
+      }
+    }
+    if (recipe !== lastRecipe.current) void roll()
+  }, [recipe])
 
   useEffect(() => {
-    setTarget(post.platform)
-    setTagsOn(Object.fromEntries(allTags.map((t) => [t, true])))
-  }, [post.id, allTags])
+    if (!restored.current || busy) return
+    saveDraft(post.id, { composer: { typeId: type?.id ?? '', lang, length, mode, target, lineId: line?.id, custom: line?.custom, text, tagsOn } })
+  }, [type?.id, lang, length, mode, target, line, text, tagsOn, busy])
 
-  const tags = mode === 'caption' ? allTags.filter((t) => tagsOn[t]) : []
+  const tags = mode === 'caption' ? allTags.filter((t) => tagsOn[t] !== false) : []
   const finalText = formatForPlatform(text, tags, target)
   const limit = platformLimits[target]
   const mine = activity.myComments[post.id] ?? 0
@@ -66,7 +89,7 @@ export function CommentComposer({ post, campaign, allowCaption }: { post: Post; 
 
   async function copy(open: boolean) {
     await copyText(finalText)
-    if (line) updateActivity((a) => ({ ...a, usedLines: { ...a.usedLines, [line.id]: true } }))
+    if (line) markLineUsed(post.id, line.id)
     toast(open ? 'Copied — opening the post…' : 'Copied to clipboard')
     if (open) window.open(post.url, '_blank', 'noopener')
   }
@@ -74,7 +97,7 @@ export function CommentComposer({ post, campaign, allowCaption }: { post: Post; 
   function markCommented() {
     updateActivity((a) => ({ ...a, myComments: { ...a.myComments, [post.id]: (a.myComments[post.id] ?? 0) + 1 } }))
     toast('Nice! Comment counted ✓')
-    roll()
+    void roll()
   }
 
   function clearMine() {
@@ -152,17 +175,18 @@ export function CommentComposer({ post, campaign, allowCaption }: { post: Post; 
             onChange={(e) => setText(e.target.value)}
             rows={length === 'long' ? 4 : 3}
             className={`w-full rounded-2xl border border-gold-200 bg-white/70 p-4 pr-28 text-[15px] leading-relaxed focus:outline-none focus:ring-2 focus:ring-gold-300 ${lang === 'th' ? 'lang-th' : ''}`}
-            placeholder="All lines of this type have been used — add more in Owner Studio."
+            placeholder={busy ? 'Writing a line for this post…' : 'All lines of this type have been used — add more in Owner Studio.'}
           />
           <button
-            onClick={roll}
-            className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full btn-gold px-3 py-1.5 text-sm"
+            onClick={() => void roll()}
+            disabled={busy}
+            className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full btn-gold px-3 py-1.5 text-sm disabled:opacity-70"
           >
-            <Dices className="size-4" /> Random
+            {busy ? <Loader2 className="size-4 animate-spin" /> : <Dices className="size-4" />} Random
           </button>
         </div>
         <p className="mt-1.5 text-xs text-gold-600">
-          {line?.custom ? 'Written by the site owner · ' : ''}Copied lines never appear again for anyone using this device.
+          {line?.custom ? 'Written by the site owner · ' : line?.id.startsWith('a:') ? 'Written for this post · ' : ''}Copied lines never appear again on this device until you clear this post’s history.
         </p>
       </Step>
 
@@ -172,12 +196,12 @@ export function CommentComposer({ post, campaign, allowCaption }: { post: Post; 
             {allTags.map((t) => (
               <button
                 key={t}
-                onClick={() => setTagsOn({ ...tagsOn, [t]: !tagsOn[t] })}
+                onClick={() => setTagsOn({ ...tagsOn, [t]: tagsOn[t] === false })}
                 className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-sm ${
-                  tagsOn[t] ? 'chip-on' : 'border-gold-200 bg-white/40 text-gold-500 line-through'
+                  tagsOn[t] !== false ? 'chip-on' : 'border-gold-200 bg-white/40 text-gold-500 line-through'
                 }`}
               >
-                {tagsOn[t] && <Check className="size-3.5" />}
+                {tagsOn[t] !== false && <Check className="size-3.5" />}
                 {t}
               </button>
             ))}
