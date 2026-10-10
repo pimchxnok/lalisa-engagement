@@ -1,4 +1,3 @@
-
 import { Check, ChevronDown, Copy, Dices, ExternalLink, Loader2, Send, Sparkles } from 'lucide-react'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -37,12 +36,12 @@ export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Cam
 
   function toast(msg: string) {
     setFlash(msg)
-    setTimeout(() => setFlash(''), 1800)
+    setTimeout(() => setFlash(''), 2600)
   }
 
   function pick() {
     if (!storyType) return null
-    return pickLine({ type: storyType, lang, length: 'short', campaign, customLines: data.customLines, used: activity.usedLines, exclude: line?.id })
+    return pickLine({ type: storyType, lang, length: 'short', campaign, customLines: data.customLines, used: getActivity().usedLines, exclude: line?.id })
   }
 
   function saveDraft(text: string | undefined) {
@@ -63,29 +62,35 @@ export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Cam
     discardDraft()
   }
 
+  async function writeWithAi() {
+    if (!storyType || writing) return
+    setWriting(true)
+    try {
+      const next = await requestAiLine({
+        mode: 'story',
+        lang,
+        length: 'short',
+        typeName: storyType.name,
+        typeDescription: storyType.description,
+        platform: post.platform,
+        campaign,
+        postCaption: post.caption.slice(0, 600),
+        avoid: line ? [line.text] : [],
+      })
+      setLine(next)
+      discardDraft()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'The AI writer is busy — try again.')
+    } finally {
+      setWriting(false)
+    }
+  }
 
-  // Restore the visitor's saved text once, after hydration
+  useEffect(() => setLine(pick()), [post.id, lang])
   useEffect(() => {
-    const draft = getActivity().storyDrafts[post.id]
-    if (draft === undefined) return
-    setBox(draft)
-    setEdited(true)
-  }, [])
-
-  function toast(msg: string) {
-    setFlash(msg)
-    setTimeout(() => setFlash(''), 2600)
-  }
-
-  async function copy(open: boolean) {
-    // Start the copy inside the tap, then open the post before the browser drops the gesture
-    const copied = copyText(box)
-    if (open) window.open(post.url, '_blank', 'noopener')
-    await copied
-    if (line) updateActivity((a) => ({ ...a, usedLines: { ...a.usedLines, [line.id]: true } }))
-    if (open) setOpened(true)
-    toast(open ? 'Caption copied — tap ✈️ → Add to story, then paste' : 'Caption copied')
-  }
+    setOn(Object.fromEntries([...mentions, ...hashtags].map((t) => [t, true])))
+    setOpened(false)
+  }, [post.id])
 
   // Rebuild the caption from the line + selected chips unless the visitor typed in it
   useEffect(() => {
@@ -95,19 +100,13 @@ export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Cam
     setBox([line?.text, m, h].filter(Boolean).join('\n'))
   }, [line, on, edited])
 
-
-  // Restore the visitor's saved text once, after hydration
+  // Restore the visitor's saved text after hydration. Runs after the rebuild above so the draft wins.
   useEffect(() => {
     const draft = getActivity().storyDrafts[post.id]
     if (draft === undefined) return
     setBox(draft)
     setEdited(true)
-  }, [])
-
-  function toast(msg: string) {
-    setFlash(msg)
-    setTimeout(() => setFlash(''), 2600)
-  }
+  }, [post.id])
 
   async function copy(open: boolean) {
     // Start the copy inside the tap, then open the post before the browser drops the gesture

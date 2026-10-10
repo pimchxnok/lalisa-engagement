@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { ArrowRight, Sparkles } from 'lucide-react'
 import { CampaignPicker, PlatformIcon, StatGrid } from '@/components/ui'
 import { SyncStatusBadge } from '@/components/SyncStatus'

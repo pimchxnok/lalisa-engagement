@@ -1,4 +1,4 @@
-type MetricKey = keyof Stats
+import type { Post } from './types'
 
 export function getCommentGoal(post: Post): number {
   if (post.kind === 'media') return post.stats.comments ?? 0

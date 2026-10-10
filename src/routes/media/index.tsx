@@ -14,7 +14,7 @@ import { useActivity, useSiteData } from '@/lib/store'
 import type { Platform } from '@/lib/types'
 
 
-export const Route = createFileRoute('/media')({
+export const Route = createFileRoute('/media/')({
   validateSearch: validateListSearch,
   component: MediaList,
 })
@@ -179,3 +179,14 @@ function MediaList() {
   )
 }
     
+
+function TierChip({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-full border px-4 py-1.5 text-sm ${on ? 'chip-on' : 'border-gold-200 bg-white/50 text-gold-700 hover:border-gold-400'}`}
+    >
+      {label}
+    </button>
+  )
+}

@@ -16,7 +16,7 @@ import type { Activity, PostDraft, SiteData, Tier } from './types'
 const DATA_KEY = 'lisa-engagement:data:v1'
 const ACTIVITY_KEY = 'lisa-engagement:activity:v1'
 
-const emptyActivity: Activity = { myComments: {}, engaged: {}, shared: {}, usedLines: {}, postLines: {}, drafts: {} }
+const emptyActivity: Activity = { myComments: {}, engaged: {}, shared: {}, usedLines: {}, storyDrafts: {}, postLines: {}, drafts: {} }
 
 let data: SiteData = defaultData
 let activity: Activity = emptyActivity
@@ -111,7 +111,7 @@ export function getSiteData() {
 /** Current activity outside React, e.g. to restore a saved draft once after hydration */
 export function getActivity(): Activity {
   load()
-  return data.activity
+  return activity
 }
 
 export function updateData(fn: (d: SiteData) => SiteData) {

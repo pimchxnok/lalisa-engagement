@@ -10,7 +10,7 @@ import { filterPosts, validateListSearch } from '@/lib/filters'
 import { useSiteData } from '@/lib/store'
 import { BackLink } from '@/components/PostNav'
 
-export const Route = createFileRoute('/posts')({
+export const Route = createFileRoute('/posts/')({
   validateSearch: validateListSearch,
   component: PostsList,
 })
