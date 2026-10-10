@@ -156,10 +156,6 @@ async function fetchPage(
   signal: AbortSignal,
   userAgent = CRAWLER_UA,
 ) {
-  initial: URL,
-  signal: AbortSignal,
-  userAgent = CRAWLER_UA,
-) {
   let url = initial
   for (let redirects = 0; redirects < 5; redirects++) {
     if (!socialPlatform(url)) throw new Error('Unsupported redirect')
@@ -175,7 +171,7 @@ async function fetchPage(
     }
     if (!response.headers.get('content-type')?.includes('text/html')) {
       await response.body?.cancel()
-      throw new Error('Unavailable')
+      throw new Error('Unavailable') 
     }
     return { html: await readText(response), url }
   }
