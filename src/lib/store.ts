@@ -179,6 +179,23 @@ export function markCommented(post: Post) {
   }))
 }
 
+export function undoCommented(post: Post) {
+  const key = engageKey(post)
+  updateActivity((current) => {
+    const count = current.myComments[post.id] ?? 0
+    if (count <= 0) return current
+    const remaining = Math.max(0, count - 1)
+    const commented = remaining > 0 || data.posts.some((other) =>
+      other.id !== post.id && engageKey(other) === key && (current.myComments[other.id] ?? 0) > 0,
+    )
+    return {
+      ...current,
+      myComments: { ...current.myComments, [post.id]: remaining },
+      status: { ...current.status, [key]: { ...current.status[key], commented } },
+    }
+  })
+}
+
 export type ResetWhat = {
   commented?: boolean
   shared?: boolean
