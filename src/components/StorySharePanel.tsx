@@ -1,11 +1,12 @@
 import { Check, ChevronDown, Copy, Dices, ExternalLink, Loader2, Send, Sparkles } from 'lucide-react'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { requestAiLine } from '@/lib/aiLine'
-import { pickLine, type PickedLine } from '@/lib/generator'
+import { fillTemplate, pickLine, type PickedLine } from '@/lib/generator'
 import { engageStatus } from '@/lib/engagement'
 import { copyText } from '@/lib/platform'
 import { getActivity, updateActivity, useActivity, useSiteData } from '@/lib/store'
+import { pickBankLine } from '@/lib/styles'
 import type { Campaign, Lang, Post } from '@/lib/types'
 
 const steps = [
@@ -40,9 +41,25 @@ export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Cam
     setTimeout(() => setFlash(''), 2600)
   }
 
-  function pick() {
+  const request = useRef(0)
+
+  /** Owner lines first half the time, then the Story style's saved bank, then the built-in phrase bank */
+  async function pick(exclude?: string) {
     if (!storyType) return null
-    return pickLine({ type: storyType, lang, length: 'short', campaign, customLines: data.customLines, used: getActivity().usedLines, exclude: line?.id })
+    const used = getActivity().usedLines
+    const customs = data.customLines.filter((l) => l.typeId === storyType.id && l.lang === lang && !used[`u:${l.id}`] && `u:${l.id}` !== exclude)
+    if (customs.length && Math.random() < 0.5) {
+      const l = customs[Math.floor(Math.random() * customs.length)]
+      return { id: `u:${l.id}`, text: fillTemplate(l.text, campaign), custom: true }
+    }
+    const banked = await pickBankLine({ styleId: storyType.style, lang, length: 'short', campaign, used, exclude })
+    return banked ?? pickLine({ type: storyType, lang, length: 'short', campaign, customLines: data.customLines, used, exclude })
+  }
+
+  async function drawLine(exclude?: string) {
+    const n = ++request.current
+    const next = await pick(exclude)
+    if (n === request.current) setLine(next)
   }
 
   function saveDraft(text: string | undefined) {
@@ -59,7 +76,7 @@ export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Cam
   }
 
   function roll() {
-    setLine(pick())
+    void drawLine(line?.id)
     discardDraft()
   }
 
@@ -87,7 +104,7 @@ export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Cam
     }
   }
 
-  useEffect(() => setLine(pick()), [post.id, lang])
+  useEffect(() => void drawLine(), [post.id, lang])
   useEffect(() => {
     setOn(Object.fromEntries([...mentions, ...hashtags].map((t) => [t, true])))
     setOpened(false)

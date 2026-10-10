@@ -1,5 +1,5 @@
 
-import { index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp } from 'drizzle-orm/pg-core'
+import { index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 
 // ── Site content (edited from Owner Studio). `position` keeps the owner's order.
 
@@ -134,3 +134,29 @@ export const postLive = pgTable('post_live', {
   syncedAt: timestamp('synced_at', { withTimezone: true }),
   metaSyncedAt: timestamp('meta_synced_at', { withTimezone: true }),
 })
+
+/** Built-in comment styles the owner defines in Studio: a topic, its keywords, a prompt and how many lines to keep ready */
+export const commentStyles = pgTable('comment_styles', {
+  id: text().primaryKey(),
+  position: integer().notNull().default(0),
+  name: text().notNull(),
+  keywords: jsonb().$type<string[]>().notNull().default([]),
+  prompt: text().notNull().default(''),
+  /** Lines to keep in the bank for each language and length */
+  bankSize: integer('bank_size').notNull().default(50),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/** Pre-written lines for each style, language and length. Random draws from here instead of writing new lines. */
+export const styleLines = pgTable(
+  'style_lines',
+  {
+    id: serial().primaryKey(),
+    styleId: text('style_id').notNull(),
+    lang: text().notNull(),
+    length: text().notNull(),
+    text: text().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('style_lines_unique').on(t.styleId, t.lang, t.length, t.text)],
+)

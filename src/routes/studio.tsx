@@ -3,6 +3,7 @@ import { KeyRound, LogOut } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { CampaignsEditor, LineTypesEditor, SiteEditor, TiersEditor, TipsEditor } from '@/components/studio/ContentEditors'
 import { inputCls } from '@/components/studio/fields'
+import { StylesEditor } from '@/components/studio/StylesEditor'
 import { PostsEditor } from '@/components/studio/PostsEditor'
 import { SectionTitle } from '@/components/ui'
 import { isOwnerPassword, SESSION_KEY, SESSION_PW_KEY } from '@/lib/owner'
@@ -17,7 +18,7 @@ const tabs = [
   { id: 'posts', label: 'Posts', el: <PostsEditor /> },
   { id: 'campaigns', label: 'Campaigns & Tags', el: <CampaignsEditor /> },
   { id: 'tiers', label: 'Media Tiers', el: <TiersEditor /> },
-  { id: 'types', label: 'Comment Types', el: <LineTypesEditor /> },
+  { id: 'types', label: 'Comment Types', el: <div className="space-y-6"><StylesEditor /><LineTypesEditor /></div> },
   { id: 'tips', label: 'Engagement Tips', el: <TipsEditor /> },
   { id: 'site', label: 'Home & Backup', el: <SiteEditor /> },
 ]

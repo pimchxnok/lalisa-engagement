@@ -59,8 +59,11 @@ export type LineType = {
   id: string
   name: string
   description: string
-  /** 'story' marks IG Story caption types; any other value is a comment type. Also picks the offline fallback bank. */
-  style: LineStyle
+  /**
+   * Id of a built-in style set up in Owner Studio (see lib/styles.ts). 'story' marks IG Story caption types;
+   * any other value is a comment type. The five original ids also pick the offline fallback phrase bank.
+   */
+  style: string
 }
 
 export type CustomLine = {
