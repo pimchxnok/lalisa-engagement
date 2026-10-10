@@ -1,9 +1,9 @@
 import { ArrowDown, ArrowUp, Download, Plus, RotateCcw, Trash2, Upload } from 'lucide-react'
 import { useState } from 'react'
-import { poolSize } from '@/lib/generator'
+import { useStyles } from '@/lib/styles'
 import { platformLabel, platforms, tipCategories } from '@/lib/platform'
 import { newId, replaceData, resetData, updateData, useSiteData } from '@/lib/store'
-import type { Campaign, Lang, LineStyle, Platform, SiteData, TipCategory } from '@/lib/types'
+import type { Campaign, Lang, Platform, SiteData, TipCategory } from '@/lib/types'
 import { uploadImage } from '@/lib/upload'
 import { ChipInput, ConfirmButton, Field, inputCls, Panel, SmallBtn } from './fields'
 
@@ -103,7 +103,7 @@ export function TiersEditor() {
   )
 }
 
-const styles: { id: LineStyle; label: string }[] = [
+const styles: { id: string; label: string }[] = [
   { id: 'hype', label: 'Over-the-top hype' },
   { id: 'sweet', label: 'Sweet & natural' },
   { id: 'concept', label: 'Campaign concept' },
@@ -113,6 +113,8 @@ const styles: { id: LineStyle; label: string }[] = [
 
 export function LineTypesEditor() {
   const { lineTypes, customLines } = useSiteData()
+  const saved = useStyles()
+  const styleOptions = saved.length ? saved.map((s) => ({ id: s.id, label: s.name })) : styles
   const [lang, setLang] = useState<Lang>('en')
   const [drafts, setDrafts] = useState<Record<string, string>>({})
 
@@ -139,9 +141,9 @@ export function LineTypesEditor() {
             <div key={t.id} className="rounded-2xl border border-gold-200 bg-white/50 p-4 space-y-3">
               <div className="grid gap-3 md:grid-cols-3">
                 <Field label="Type name"><input value={t.name} onChange={(e) => patchItem('lineTypes', t.id, { name: e.target.value })} className={inputCls} /></Field>
-                <Field label="Built-in style" hint={`${poolSize(t.style, lang, t.style === 'story' ? 'short' : 'long').toLocaleString('en-US')} generated lines available`}>
-                  <select value={t.style} onChange={(e) => patchItem('lineTypes', t.id, { style: e.target.value as LineStyle })} className={inputCls}>
-                    {styles.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                <Field label="Built-in style" hint={`${saved.find((s) => s.id === t.style)?.counts[`${lang}:${t.style === 'story' ? 'short' : 'medium'}`] ?? 0} saved lines in this style's bank`}>
+                  <select value={t.style} onChange={(e) => patchItem('lineTypes', t.id, { style: e.target.value })} className={inputCls}>
+                    {styleOptions.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
                   </select>
                 </Field>
                 <Field label="Description"><input value={t.description} onChange={(e) => patchItem('lineTypes', t.id, { description: e.target.value })} className={inputCls} /></Field>

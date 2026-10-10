@@ -222,6 +222,13 @@ function build(style: LineStyle, lang: Lang, length: LineLength, index: number, 
   return fillTemplate(`${text} ${b.emojis[d[2]]}`, c)
 }
 
+/** Owner-made styles have no phrase bank of their own, so they fall back to the closest built-in one */
+const bankStyles: LineStyle[] = ['hype', 'sweet', 'concept', 'fashion', 'story']
+
+function fallbackStyle(style: string): LineStyle {
+  return bankStyles.includes(style as LineStyle) ? (style as LineStyle) : 'sweet'
+}
+
 export type PickedLine = { id: string; text: string; custom: boolean }
 
 export function pickLine(opts: {
@@ -243,15 +250,16 @@ export function pickLine(opts: {
     return { id: `u:${l.id}`, text: fillTemplate(l.text, campaign), custom: true }
   }
   const len = type.style === 'story' ? 'short' : length
-  const size = poolSize(type.style, lang, len)
-  const prefix = `g:${type.style}:${lang}:${len}:${campaign?.id ?? '-'}:`
+  const style = fallbackStyle(type.style)
+  const size = poolSize(style, lang, len)
+  const prefix = `g:${style}:${lang}:${len}:${campaign?.id ?? '-'}:`
   const start = Math.floor(Math.random() * size)
   // Stride by a prime that never divides the pool sizes so every index is visited
   for (let k = 0; k < size; k++) {
     const idx = (start + k * 7919) % size
     const id = prefix + idx
     if (!used[id] && id !== exclude) {
-      return { id, text: build(type.style, lang, len, idx, campaign), custom: false }
+      return { id, text: build(style, lang, len, idx, campaign), custom: false }
     }
   }
   if (customs.length) {
