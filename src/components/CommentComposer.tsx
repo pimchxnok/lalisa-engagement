@@ -5,7 +5,6 @@ import {
   ExternalLink,
   Languages,
   Loader2,
-  RotateCcw,
   Smartphone,
   Sparkles,
 } from 'lucide-react'
@@ -19,7 +18,7 @@ import {
 } from '@/lib/generator'
 import { nextLine } from '@/lib/lineWriter'
 import { copyText } from '@/lib/platform'
-import { getActivity, getSiteData, markLineUsed, saveDraft, updateActivity, useActivity, useSiteData } from '@/lib/store'
+import { getActivity, getSiteData, markLineUsed, saveDraft, useSiteData } from '@/lib/store'
 import type { Campaign, Lang, LineLength, Platform, Post } from '@/lib/types'
 
 type Mode = 'comment' | 'caption'
@@ -30,10 +29,12 @@ const lengths: { id: LineLength; label: string }[] = [
   { id: 'long', label: 'Long' },
 ]
 
-/** Render with `key={post.id}` so each post starts from its own saved draft */
-export function CommentComposer({ post, campaign, allowCaption }: { post: Post; campaign?: Campaign; allowCaption: boolean }) {
+/**
+ * Render with `key={post.id}` so each post starts from its own saved draft.
+ * "I commented" lives in the page's bottom status bar; bump `rollSignal` from there to draw a fresh line.
+ */
+export function CommentComposer({ post, campaign, allowCaption, rollSignal = 0 }: { post: Post; campaign?: Campaign; allowCaption: boolean; rollSignal?: number }) {
   const data = useSiteData()
-  const activity = useActivity()
   const types = data.lineTypes.filter((t) => t.style !== 'story')
 
   const [typeId, setTypeId] = useState(types[0]?.id ?? '')
@@ -124,6 +125,11 @@ export function CommentComposer({ post, campaign, allowCaption }: { post: Post; 
     if (recipe !== lastRecipe.current) void roll()
   }, [recipe])
 
+  // A logged comment means this line is spent, so offer the next one
+  useEffect(() => {
+    if (rollSignal > 0) void roll()
+  }, [rollSignal])
+
   useEffect(() => {
     if (!restored.current || busy) return
     saveDraft(post.id, { composer: { typeId: type?.id ?? '', lang, length, mode, target, lineId: line?.id, custom: line?.custom, text, tagsOn } })
@@ -132,7 +138,6 @@ export function CommentComposer({ post, campaign, allowCaption }: { post: Post; 
   const tags = mode === 'caption' ? allTags.filter((t) => tagsOn[t] !== false) : []
   const finalText = formatForPlatform(text, tags, target)
   const limit = platformLimits[target]
-  const mine = activity.myComments[post.id] ?? 0
 
   function toast(msg: string) {
     setFlash(msg)
@@ -144,19 +149,6 @@ export function CommentComposer({ post, campaign, allowCaption }: { post: Post; 
     if (line) markLineUsed(post.id, line.id)
     toast(open ? 'Copied — opening the post…' : 'Copied to clipboard')
     if (open) window.open(post.url, '_blank', 'noopener')
-  }
-
-  function markCommented() {
-    updateActivity((a) => ({ ...a, myComments: { ...a.myComments, [post.id]: (a.myComments[post.id] ?? 0) + 1 } }))
-    toast('Nice! Comment counted ✓')
-    void roll()
-  }
-
-  function clearMine() {
-    updateActivity((a) => {
-      const { [post.id]: _, ...rest } = a.myComments
-      return { ...a, myComments: rest }
-    })
   }
 
   return (
@@ -298,25 +290,7 @@ export function CommentComposer({ post, campaign, allowCaption }: { post: Post; 
             <Copy className="size-4" /> Copy only
           </button>
         </div>
-      </Step>
-
-      <Step n={mode === 'caption' ? 5 : 4} title="Done commenting?">
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={markCommented}
-            className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-5 py-2.5 text-sm font-medium text-white shadow hover:bg-emerald-600"
-          >
-            <Check className="size-4" /> I commented ✓
-          </button>
-          <span className="text-sm text-gold-800">
-            You’ve commented <b>{mine}</b> {mine === 1 ? 'time' : 'times'} on this post
-          </span>
-          {mine > 0 && (
-            <button onClick={clearMine} className="inline-flex items-center gap-1 text-xs text-gold-600 hover:text-rose-600">
-              <RotateCcw className="size-3.5" /> Clear my comments
-            </button>
-          )}
-        </div>
+        <p className="mt-2 text-xs text-gold-600">Posted it? Tap <b>I commented</b> at the bottom of the page to save your progress.</p>
       </Step>
 
       {flash && (

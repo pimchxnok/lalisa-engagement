@@ -9,14 +9,15 @@
 import { useSyncExternalStore } from 'react'
 import { defaultData } from '@/data/fixtures'
 
+import { engageKey, type EngageStatus } from './engagement'
 import { platforms } from './platform'
-import type { Activity, PostDraft, SiteData, Tier } from './types'
+import type { Activity, Post, PostDraft, SiteData, Tier } from './types'
 
 
 const DATA_KEY = 'lisa-engagement:data:v1'
 const ACTIVITY_KEY = 'lisa-engagement:activity:v1'
 
-const emptyActivity: Activity = { myComments: {}, engaged: {}, shared: {}, usedLines: {}, storyDrafts: {}, postLines: {}, drafts: {} }
+const emptyActivity: Activity = { myComments: {}, engaged: {}, shared: {}, status: {}, usedLines: {}, storyDrafts: {}, postLines: {}, drafts: {} }
 
 let data: SiteData = defaultData
 let activity: Activity = emptyActivity
@@ -39,6 +40,18 @@ function withPlatformTiers(d: SiteData): SiteData {
   }
 }
 
+/** Story ticks used to be saved per post id; move them to the shared per-post status */
+function withEngageStatus(a: Activity, posts: Post[]): Activity {
+  if (!Object.keys(a.shared).length) return a
+  const status = { ...a.status }
+  for (const p of posts) {
+    if (!a.shared[p.id]) continue
+    const k = engageKey(p)
+    status[k] = { ...status[k], shared: status[k]?.shared ?? true }
+  }
+  return { ...a, shared: {}, status }
+}
+
 function load() {
   if (loaded || typeof window === 'undefined') return
   loaded = true
@@ -46,7 +59,7 @@ function load() {
     const d = localStorage.getItem(DATA_KEY)
     if (d) data = withPlatformTiers({ ...defaultData, ...JSON.parse(d) })
     const a = localStorage.getItem(ACTIVITY_KEY)
-    if (a) activity = { ...emptyActivity, ...JSON.parse(a) }
+    if (a) activity = withEngageStatus({ ...emptyActivity, ...JSON.parse(a) }, data.posts)
   } catch {
     // Corrupt storage falls back to defaults
   }
@@ -150,33 +163,76 @@ export function saveDraft(postId: string, patch: PostDraft) {
   }))
 }
 
-/** Wipes everything this visitor did on one post: comment count, ticks, drafts, and the lines copied there */
-export function clearPostHistory(postId: string) {
+/** Saves one activity's status for a post; both sections see it because it is keyed by the post link */
+export function setEngageStatus(post: Post, patch: Partial<EngageStatus>) {
+  const k = engageKey(post)
+  updateActivity((a) => ({ ...a, status: { ...a.status, [k]: { ...a.status[k], ...patch } } }))
+}
+
+/** "I commented": marks the comment status and adds one to this visitor's comment count on the post */
+export function markCommented(post: Post) {
+  const k = engageKey(post)
+  updateActivity((a) => ({
+    ...a,
+    myComments: { ...a.myComments, [post.id]: (a.myComments[post.id] ?? 0) + 1 },
+    status: { ...a.status, [k]: { ...a.status[k], commented: true } },
+  }))
+}
+
+export type ResetWhat = {
+  commented?: boolean
+  shared?: boolean
+  /** Comment counts ("You've commented N times") */
+  counts?: boolean
+  /** Copied lines and saved drafts, so those lines can be served again */
+  history?: boolean
+}
+
+/** Clears the chosen parts of this visitor's activity on the given posts only */
+export function resetEngagement(posts: Post[], what: ResetWhat) {
+  const ids = new Set(posts.map((p) => p.id))
+  const keys = new Set(posts.map(engageKey))
   updateActivity((a) => {
     const drop = <T,>(r: Record<string, T>) =>
-      Object.fromEntries(Object.entries(r).filter(([k]) => k !== postId))
+      Object.fromEntries(Object.entries(r).filter(([k]) => !ids.has(k)))
 
-    const freed = new Set(a.postLines[postId] ?? [])
-    const stillUsed = new Set(
-      Object.entries(a.postLines)
-        .filter(([k]) => k !== postId)
-        .flatMap(([, ids]) => ids),
+    const status = Object.fromEntries(
+      Object.entries(a.status).flatMap(([k, s]) => {
+        if (!keys.has(k)) return [[k, s]]
+        const next = { ...s }
+        if (what.commented) delete next.commented
+        if (what.shared) delete next.shared
+        return Object.keys(next).length ? [[k, next]] : []
+      }),
     )
 
-    return {
-      myComments: drop(a.myComments),
-      engaged: drop(a.engaged),
-      shared: drop(a.shared),
-      usedLines: Object.fromEntries(
-        Object.entries(a.usedLines).filter(
-          ([id]) => !freed.has(id) || stillUsed.has(id),
-        ),
-      ) as Record<string, true>,
-      postLines: drop(a.postLines),
-      drafts: drop(a.drafts),
-      storyDrafts: drop(a.storyDrafts),
+    let next: Activity = { ...a, status }
+    if (what.counts) next = { ...next, myComments: drop(a.myComments) }
+    if (what.history) {
+      const freed = new Set([...ids].flatMap((id) => a.postLines[id] ?? []))
+      const stillUsed = new Set(
+        Object.entries(a.postLines)
+          .filter(([k]) => !ids.has(k))
+          .flatMap(([, lineIds]) => lineIds),
+      )
+      next = {
+        ...next,
+        engaged: drop(a.engaged),
+        usedLines: Object.fromEntries(
+          Object.entries(a.usedLines).filter(([id]) => !freed.has(id) || stillUsed.has(id)),
+        ) as Record<string, true>,
+        postLines: drop(a.postLines),
+        drafts: drop(a.drafts),
+        storyDrafts: drop(a.storyDrafts),
+      }
     }
+    return next
   })
+}
+
+/** Wipes everything this visitor did on one post: comment count, ticks, drafts, and the lines copied there */
+export function clearPostHistory(post: Post) {
+  resetEngagement([post], { commented: true, shared: true, counts: true, history: true })
 }
 
 export function replaceData(next: SiteData) {

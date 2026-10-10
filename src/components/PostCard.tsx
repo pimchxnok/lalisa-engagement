@@ -1,6 +1,8 @@
 import { Link } from '@tanstack/react-router'
-import { Check, MessageCircle } from 'lucide-react'
+import { MessageCircle } from 'lucide-react'
+import { EngageRibbon } from './EngageStatus'
 import { GoalBar, OpenPostLink, PostThumb, StatGrid } from './ui'
+import { engageStatus } from '@/lib/engagement'
 import type { ListSearch } from '@/lib/filters'
 import { useActivity, useSiteData } from '@/lib/store'
 import type { Post } from '@/lib/types'
@@ -18,7 +20,8 @@ export function PostCard({ post, search }: { post: Post; search: ListSearch }) {
   const displayGoal = isMedia ? post.stats.comments : (post.commentGoal ?? 0)
 
   return (
-    <article className="glass rounded-3xl p-4 flex flex-col gap-4">
+    <article className="glass relative rounded-3xl p-4 pt-9 flex flex-col gap-4">
+      <EngageRibbon post={post} status={engageStatus(activity, post)} />
       <div className="flex gap-4">
         {!isMedia && <PostThumb post={post} className="size-28 shrink-0" />}
         <div className="min-w-0 flex-1">
@@ -32,8 +35,6 @@ export function PostCard({ post, search }: { post: Post; search: ListSearch }) {
                 {tier.name}
               </span>
             )}
-            {activity.engaged[post.id] && <Badge>Engaged</Badge>}
-            {activity.shared[post.id] && <Badge>Shared</Badge>}
           </div>
           <p className="mt-1.5 font-medium text-gold-900 line-clamp-2">{postTitle(post)}</p>
           <p className="text-sm text-gold-700/80 line-clamp-2">{post.caption}</p>
@@ -53,13 +54,5 @@ export function PostCard({ post, search }: { post: Post; search: ListSearch }) {
         <MessageCircle className="size-4" /> {isMedia ? 'Engage this post' : 'Comment on this post'}
       </Link>
     </article>
-  )
-}
-
-function Badge({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-700">
-      <Check className="size-3" /> {children}
-    </span>
   )
 }

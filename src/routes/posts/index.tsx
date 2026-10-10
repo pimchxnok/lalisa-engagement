@@ -3,6 +3,7 @@
  */
 
 import { createFileRoute } from '@tanstack/react-router'
+import { EngageResetBar } from '@/components/EngageStatus'
 import { PostCard } from '@/components/PostCard'
 import { SectionTitle } from '@/components/ui'
 import { SyncStatusBadge } from '@/components/SyncStatus'
@@ -30,6 +31,13 @@ function PostsList() {
       <SectionTitle eyebrow={campaign?.name} title="Comment on LISA & Brand posts">
         Help these posts reach their comment goals. The owner sets each goal—let's make them happen together.
       </SectionTitle>
+      <EngageResetBar
+        scopes={[
+          { id: 'shown', label: campaign ? `${campaign.name} posts shown here` : 'Posts shown here', posts },
+          { id: 'section', label: 'All LISA & Brand posts', posts: filterPosts(data.posts, 'own', {}) },
+          { id: 'both', label: 'LISA & Brand + Media posts', posts: data.posts },
+        ]}
+      />
       <div className="grid gap-6 md:grid-cols-2">
         {posts.map((post) => (
           <PostCard key={post.id} post={post} search={search} />
