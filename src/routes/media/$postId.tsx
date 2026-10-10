@@ -64,7 +64,6 @@ function MediaDetail() {
 
         </div>
       </div>
-<
       {canStory && (
         <div className="glass grid grid-cols-2 gap-1 rounded-full p-1" role="tablist" aria-label="What do you want to do?">
           <ModeTab on={view === 'engage'} onClick={() => setMode('engage')} done={engaged} icon={<Heart className="size-4" />} label="Engagement Post" />
