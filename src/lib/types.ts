@@ -47,6 +47,8 @@ export type Post = {
   communityComments: number
   tierId?: string
   postedAt: string
+  /** When the live numbers were last read from the post link (set by the server, never stored) */
+  syncedAt?: string
   /** Extra @ tags the story-share box should include for this post */
   extraMentions?: string[]
 }
@@ -96,7 +98,7 @@ export type SiteData = {
 export type Activity = {
   /** Comments this visitor has ticked per post */
   myComments: Record<string, number>
-  /** Media posts this visitor marked as engaged */
+  /** Posts this visitor confirmed they engaged (LISA, Brand and Media) */
   engaged: Record<string, boolean>
   /** Media posts this visitor shared to story */
   shared: Record<string, boolean>
