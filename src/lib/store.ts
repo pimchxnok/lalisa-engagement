@@ -113,9 +113,6 @@ export function getActivity(): Activity {
   load()
   return data.activity
 }
-  load()
-  return activity
-}
 
 export function updateData(fn: (d: SiteData) => SiteData) {
   load()
