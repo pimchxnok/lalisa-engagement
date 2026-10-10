@@ -1,12 +1,16 @@
+/**
+ * PLAN.md - Updated for Milestone 4
+ */
+
 # LISA ENGAGEMENT — Product Roadmap
 
 ## Milestone 1 — Product surface ✅
 Branded gold/glass site with every screen clickable, running on the sample data in `src/data/fixtures.ts`:
 - **Home**: LISA photo slot, campaign buttons, total engagement per platform (TikTok / IG Post / IG Reel).
-- **LISA & Brand Post**: campaign + platform + LISA/Brand filters, post cards with stats and comment goals, a per-post comment flow (type → line → tags → copy / copy + open → "I commented ✓" → count, clear), Random, TH/EN, platform format, length, and previous / next / back-to-list.
-- **Media Post**: season overview per platform, reviewed progress, tier filter (in tier order), per-post engage tick, random comments (no tags), IG Story share box (@ and # chips, short random caption, "Tags to copy", pink Copy tags + open post, green Mark as shared).
+- **LISA & Brand Post**: campaign + platform + LISA/Brand filters, post cards with stats and comment goals, a per-post comment flow (type → line → tags → copy / copy + open → "I commented ✓").
+- **Media Post**: season overview per platform, reviewed progress, tier filter (in tier order), per-post engage tick, random comments (no tags), IG Story share box (@ and # chips, short random caption).
 - **Engagement Tips**: EMV / MIV / Like / Share / Comment / Repost topics.
-- **Owner Studio** (password gate): posts (paste a link to detect platform & account), campaigns and #/@ tags, renameable and reorderable tiers, editable comment types plus custom lines, tips, home photo, export / import backup.
+- **Owner Studio** (password gate): posts (paste a link to detect platform & account), campaigns and #/@ tags, renameable and reorderable tiers, editable comment types plus custom lines, tips, home photo.
 - Generator: 1,000+ unique lines per type × language × length. Copied lines are never served again.
 
 Right now, edits and visitor activity are saved in each browser's localStorage.
@@ -22,13 +26,15 @@ Right now, edits and visitor activity are saved in each browser's localStorage.
 - A global used-line registry, so a line copied by anyone is never served to anyone again.
 - Shared engaged/shared counters for Media "Reviewed progress".
 
-## Milestone 4 — Auto-fill from link & live stats sync
-- Pasting a link now reads an editable post title, caption and optional linked cover from TikTok oEmbed or public Instagram preview metadata. Preview retrieval is independent of the configured metrics service. Platforms can block public previews, and linked covers can expire; manual titles and optional uploads remain available. Media posts have no cover UI or cover retrieval.
-- LISA & Brand cards and detail pages show only post comments against the owner-set goal, with muted ruby → champagne → jade progress colors. Media keeps its engagement and story-sharing flows without fan-comment goal bars.
-- Studio deletion and restoring sample content now use in-page Confirm/Cancel controls rather than browser dialogs. Deleting a campaign or tier keeps its posts without that association; deleting a comment type removes its custom lines.
-- A scheduled Netlify Function (every 15–30 min) refreshes views / likes / comments / saves / shares / reposts for every post. It also updates `lastSyncedAt`.
-- Platform constraint: TikTok and Instagram do not offer public APIs for other accounts' full metrics. Saves and shares are only exposed to the post owner. Live numbers need a third-party data provider (e.g. an Apify / RapidAPI scraper actor), whose API key the owner adds as an environment variable. Any metric the provider can't return stays editable in the Studio.
-- Media comment goals follow the synced comment count automatically.
+## Milestone 4 — Auto-sync stats (IN PROGRESS) 🔄
+- **Scheduled Netlify Function** (every 30 min): fetches latest metrics from SourceVine for all posts with URLs.
+- **Public metrics** (auto-updated): views, likes, comments, shares.
+- **Private metrics** (owner-entered, never overwritten): saves, reposts (IG doesn't expose these publicly).
+- **Media comment goal**: automatically uses synced `stats.comments` as the live engagement target.
+- **lastSyncedAt**: timestamp updates after each successful sync; shown on Home + detail pages.
+- **UI indicators**: "Last synced 2h ago" badge on Home, sync time on detail pages.
+- Stats sync works reliably with 80–150 posts; manual "Update all" in Owner Studio also available.
+- SourceVine API integration ready; missing private metrics don't block sync.
 
 ## Milestone 5 — Content & polish
 - The owner writes the real tips and adds real posts and photos.

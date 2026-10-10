@@ -35,3 +35,17 @@ export function PostNav({ list, current, section, search }: { list: Post[]; curr
     </div>
   )
 }
+
+/** Back to the section list from a list page */
+export function BackLink({ campaign }: { campaign?: string }) {
+  return (
+    <Link
+      to="/media"
+      search={campaign ? { campaign } : {}}
+      className="btn-gold inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm"
+    >
+      <LayoutGrid className="size-4" />
+      Back to Media Post
+    </Link>
+  )
+}

@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { CommentComposer } from '@/components/CommentComposer'
 import { PostNav } from '@/components/PostNav'
 import { EmptyState, GoalBar, OpenPostLink, PostThumb, StatGrid } from '@/components/ui'
+import { SyncStatusInfo } from '@/components/SyncStatus'
 import { filterPosts, validateListSearch } from '@/lib/filters'
 import { platformLabel, postTitle } from '@/lib/platform'
 import { clearPostHistory, useSiteData } from '@/lib/store'
@@ -35,6 +36,7 @@ function PostDetail() {
             <p className="mt-1 text-gold-800/80">{post.caption}</p>
             <OpenPostLink url={post.url}>Open on {platformLabel[post.platform]}</OpenPostLink>
           </div>
+          <SyncStatusInfo />
           <StatGrid platform={post.platform} stats={post.stats} size="sm" />
           <GoalBar done={post.stats.comments} goal={post.commentGoal ?? 0} label="Comments on the post vs. goal" />
         </div>

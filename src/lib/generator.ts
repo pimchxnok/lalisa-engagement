@@ -200,7 +200,7 @@ export function poolSize(style: LineStyle, lang: Lang, length: LineLength) {
   return radix(style, lang, length).reduce((a, x) => a * x, 1)
 }
 
-function fill(t: string, c?: Campaign) {
+export function fillTemplate(t: string, c?: Campaign) {
   return t.replaceAll('{brand}', c?.brand ?? 'LISA').replaceAll('{campaign}', c?.name ?? 'this')
 }
 
@@ -219,7 +219,7 @@ function build(style: LineStyle, lang: Lang, length: LineLength, index: number, 
   if (lang === 'en' && style !== 'story') text += d[1] % 2 ? '!' : '.'
   if (d[3] !== undefined) text += ` ${b.extras[d[3]]}`
   if (d[4] !== undefined) text += ` ${b.closers[d[4]]}`
-  return fill(`${text} ${b.emojis[d[2]]}`, c)
+  return fillTemplate(`${text} ${b.emojis[d[2]]}`, c)
 }
 
 export type PickedLine = { id: string; text: string; custom: boolean }
@@ -240,7 +240,7 @@ export function pickLine(opts: {
   // Owner-written lines get served first, half of the time
   if (customs.length && Math.random() < 0.5) {
     const l = customs[Math.floor(Math.random() * customs.length)]
-    return { id: `u:${l.id}`, text: fill(l.text, campaign), custom: true }
+    return { id: `u:${l.id}`, text: fillTemplate(l.text, campaign), custom: true }
   }
   const len = type.style === 'story' ? 'short' : length
   const size = poolSize(type.style, lang, len)
@@ -256,7 +256,7 @@ export function pickLine(opts: {
   }
   if (customs.length) {
     const l = customs[0]
-    return { id: `u:${l.id}`, text: fill(l.text, campaign), custom: true }
+    return { id: `u:${l.id}`, text: fillTemplate(l.text, campaign), custom: true }
   }
   return null
 }

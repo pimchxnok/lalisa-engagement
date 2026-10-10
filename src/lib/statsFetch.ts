@@ -1,3 +1,10 @@
+
+/**
+ * Enhanced statsFetch with proper public/private metrics separation
+ * Public: views, likes, comments, shares (from SourceVine)
+ * Private: saves, reposts (IG doesn't expose; keep owner's values)
+ */
+
 import type { Platform, Stats } from './types'
 
 import { fetchPage, fetchPostMetadata, fetchPublicCounts, instagramCode, readMeta, resolveShareLink, socialPlatform, tiktokPost } from './postMetadata'
@@ -144,7 +151,38 @@ async function readSourcevine(url: URL, platform: Platform, signal: AbortSignal)
     if (!response.ok) return undefined
     const result = (await response.json()) as SourcevineResponse
     const data = result.data
+
     if (result.success !== true || result.available === false || !data) return undefined
+
+    const views = num(data.views)
+    const likes = num(data.likes)
+    const comments = num(data.comments)
+    const shares = num(data.shares)
+
+    // Private metrics (IG typically doesn't expose these in public API)
+    const saves = num(data.saves ?? data.collects)
+    const reposts = num(data.reposts)
+
+    const stats: Partial<Stats> = {
+      // PUBLIC METRICS — safe to update from API
+      ...(views !== undefined ? { views } : {}),
+      ...(likes !== undefined ? { likes } : {}),
+      ...(comments !== undefined ? { comments } : {}),
+      ...(shares !== undefined ? { shares } : {}),
+      // PRIVATE METRICS — only update if SourceVine returns them
+      ...(saves !== undefined && saves > 0 ? { saves } : {}),
+      ...(reposts !== undefined && reposts > 0 ? { reposts } : {}),
+    }
+
+    const keys: (keyof Stats)[] = [
+      'views',
+      'likes',
+      'comments',
+      'shares',
+      'saves',
+      'reposts',
+    ]
+
     return {
       account: data.channelName ? `@${data.channelName}` : undefined,
       stats: compact({
@@ -156,6 +194,7 @@ async function readSourcevine(url: URL, platform: Platform, signal: AbortSignal)
         reposts: num(data.reposts),
       }),
     }
+
   } catch {
     return undefined
   }
@@ -168,11 +207,19 @@ async function fetchMetrics(rawUrl: string): Promise<FetchedStats> {
   } catch {
     return { stats: {}, missing: [], error: 'That link is not a valid URL.' }
   }
+
   let platform = socialPlatform(url)
-  if (!platform) return { stats: {}, missing: [], error: 'Use an HTTPS TikTok or Instagram post link.' }
+  if (!platform) {
+    return {
+      stats: {},
+      missing: [],
+      error: 'Use an HTTPS TikTok or Instagram post link.',
+    }
+  }
 
   const signal = AbortSignal.timeout(15000)
   let metrics: Metrics | undefined
+
   try {
     if (platform === 'tiktok' ? !tiktokPost(url) : !instagramCode(url)) {
       url = await resolveShareLink(url, signal)
@@ -210,6 +257,9 @@ export async function fetchLiveStats(rawUrl: string): Promise<FetchedStats> {
 }
 
 export async function fetchStats(rawUrl: string, includeCover = true): Promise<FetchedStats> {
-  const [metrics, metadata] = await Promise.all([fetchLiveStats(rawUrl), fetchPostMetadata(rawUrl, includeCover)])
+  const [metrics, metadata] = await Promise.all([
+    fetchLiveStats(rawUrl),
+    fetchPostMetadata(rawUrl, includeCover),
+  ])
   return { ...metrics, ...metadata, account: metrics.account ?? metadata.account, platform: metadata.platform === 'ig-reel' ? metadata.platform : metrics.platform ?? metadata.platform }
 }

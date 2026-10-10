@@ -94,9 +94,11 @@ async function readBytes(response: Response, limit: number) {
 const readText = async (response: Response) => new TextDecoder().decode(await readBytes(response, 2_000_000))
 
 /** Fetches a TikTok/Instagram page, following redirects only while they stay on those sites */
-
-export async function fetchPage(initial: URL, signal: AbortSignal, userAgent = CRAWLER_UA) {
-
+export async function fetchPage(
+  initial: URL,
+  signal: AbortSignal,
+  userAgent = CRAWLER_UA,
+) {
   let url = initial
   for (let redirects = 0; redirects < 5; redirects++) {
     if (!socialPlatform(url)) throw new Error('Unsupported redirect')
@@ -120,6 +122,7 @@ export async function fetchPage(initial: URL, signal: AbortSignal, userAgent = C
 /** Follows share links (vt.tiktok.com, tiktok.com/t/…, instagram.com/share/…) to the real post address */
 export async function resolveShareLink(initial: URL, signal: AbortSignal) {
   let url = initial
+  
   for (let redirects = 0; redirects < 5; redirects++) {
     if (!socialPlatform(url)) throw new Error('Unsupported redirect')
     const response = await fetch(url, { method: 'GET', redirect: 'manual', signal, headers: { 'User-Agent': CRAWLER_UA } })
