@@ -22,8 +22,6 @@ export const Route = createFileRoute('/media')({
 
 function MediaList() {
   const search = Route.useSearch()
-function MediaList() {
-  const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const data = useSiteData()
   const activity = useActivity()
@@ -182,16 +180,3 @@ function MediaList() {
   )
 }
     
-      </div>
-      <SectionTitle eyebrow={campaign?.name || 'Media coverage'} title="Engage media posts about LISA">
-        Every like, comment and share on these posts counts toward LISA's exposure. Share to your story, like, comment, repost.
-      </SectionTitle>
-      <div className="grid gap-6 md:grid-cols-2">
-        {posts.map((post) => (
-          <PostCard key={post.id} post={post} search={search} />
-        ))}
-      </div>
-      {posts.length === 0 && <p className="text-center text-gold-600">No media posts found for this campaign.</p>}
-    </div>
-  )
-}
