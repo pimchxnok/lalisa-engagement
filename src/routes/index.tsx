@@ -1,6 +1,7 @@
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { ArrowRight, Sparkles } from 'lucide-react'
 import { CampaignPicker, PlatformIcon, StatGrid } from '@/components/ui'
+import { SyncStatusBadge } from '@/components/SyncStatus'
 import { formatNum, imageSrc, platformLabel, platforms, sumStats } from '@/lib/platform'
 import { useSiteData } from '@/lib/store'
 
@@ -34,7 +35,7 @@ function Home() {
                 className="h-full w-full rounded-[2rem] object-cover"
               />
             ) : (
-              <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-[2rem] border border-dashed border-gold-300 bg-gradient-to-br from-white/70 via-gold-50/70 to-gold-100/70 text-gold-600">
+              <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-[2rem] border border-dashed border-gold-300 bg-gradient-to-br from-white/70 via-gold-50/70 to-gold-100/50 text-gold-600">
                 <Sparkles className="size-8" strokeWidth={1.2} />
                 <p className="font-display text-2xl text-gold-700">LISA photo</p>
                 <p className="text-xs tracking-wide">Add it any time from Owner Studio</p>
@@ -45,6 +46,9 @@ function Home() {
         <h1 className="mt-10 font-display text-5xl md:text-7xl font-semibold tracking-[0.12em] gold-text">LISA ENGAGEMENT</h1>
         <p className="mt-4 text-gold-800/80">{settings.tagline}</p>
         <div className="gold-rule w-48 mx-auto my-8" />
+        <div className="mb-5 flex justify-center">
+          <SyncStatusBadge />
+        </div>
         <p className="mb-4 uppercase tracking-[0.35em] text-[11px] text-gold-600">Choose a campaign</p>
         <CampaignPicker
           campaigns={data.campaigns}

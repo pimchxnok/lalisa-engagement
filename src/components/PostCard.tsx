@@ -14,6 +14,9 @@ export function PostCard({ post, search }: { post: Post; search: ListSearch }) {
   const isMedia = post.kind === 'media'
   const tier = data.tiers.find((t) => t.id === post.tierId)
 
+  // Media posts use their comment count as the display goal
+  const displayGoal = isMedia ? post.stats.comments : (post.commentGoal ?? 0)
+
   return (
     <article className="glass rounded-3xl p-4 flex flex-col gap-4">
       <div className="flex gap-4">
@@ -40,7 +43,7 @@ export function PostCard({ post, search }: { post: Post; search: ListSearch }) {
         </div>
       </div>
       <StatGrid platform={post.platform} stats={post.stats} size="sm" />
-      {!isMedia && <GoalBar done={post.stats.comments} goal={post.commentGoal ?? 0} label="Comments on the post vs. goal" />}
+      <GoalBar done={post.stats.comments} goal={displayGoal} label={isMedia ? 'Comments (live from platform)' : 'Comments on the post vs. goal'} />
       <Link
         to={isMedia ? '/media/$postId' : '/posts/$postId'}
         params={{ postId: post.id }}

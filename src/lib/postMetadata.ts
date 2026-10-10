@@ -151,7 +151,7 @@ async function fetchRetry(url: URL, init: RequestInit) {
 }
 
 /** Fetches a TikTok/Instagram page, following redirects only while they stay on those sites */
-async function fetchPage(initial: URL, signal: AbortSignal, userAgent = CRAWLER_UA) {
+    async function fetchPage(initial: URL, signal: AbortSignal) {
   let url = initial
   for (let redirects = 0; redirects < 5; redirects++) {
     if (!socialPlatform(url)) throw new Error('Unsupported redirect')
@@ -177,6 +177,7 @@ async function fetchPage(initial: URL, signal: AbortSignal, userAgent = CRAWLER_
 /** Follows share links (vt.tiktok.com, tiktok.com/t/…, instagram.com/share/…) to the real post address */
 async function resolveShareLink(initial: URL, signal: AbortSignal) {
   let url = initial
+  
   for (let redirects = 0; redirects < 5; redirects++) {
     if (!socialPlatform(url)) throw new Error('Unsupported redirect')
     const response = await fetchRetry(url, { method: 'GET', redirect: 'manual', signal, headers: { 'User-Agent': url.hostname.includes('tiktok') ? BROWSER_UA : CRAWLER_UA } })
