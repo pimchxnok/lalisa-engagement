@@ -94,7 +94,6 @@ async function readBytes(response: Response, limit: number) {
 const readText = async (response: Response) => new TextDecoder().decode(await readBytes(response, 2_000_000))
 
 /** Fetches a TikTok/Instagram page, following redirects only while they stay on those sites */
-const readText = async (response: Response) => new TextDecoder().decode(await readBytes(response, 2_000_000))
 
   let url = initial
   for (let redirects = 0; redirects < 5; redirects++) {
@@ -123,7 +122,7 @@ const readText = async (response: Response) => new TextDecoder().decode(await re
 
 /** Follows share links (vt.tiktok.com, tiktok.com/t/…, instagram.com/share/…) to the real post address */
 async function resolveShareLink(initial: URL, signal: AbortSignal) {
-  let url = initialet url = initial
+  let url = initial
   for (let redirects = 0; redirects < 5; redirects++) {
     if (!socialPlatform(url)) throw new Error('Unsupported redirect')
     const response = await fetch(url, { redirect: 'manual', signal, headers: { Accept: 'text/html', 'User-Agent': userAgent, 'Accept-Language': 'en' } })
