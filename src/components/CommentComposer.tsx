@@ -68,7 +68,7 @@ export function CommentComposer({ post, campaign, allowCaption }: { post: Post; 
     setText(next?.text ?? '')
   }
 
-<  async function writeWithAi() {
+  async function writeWithAi() {
     if (!type || writing) return
     setWriting(true)
     try {
