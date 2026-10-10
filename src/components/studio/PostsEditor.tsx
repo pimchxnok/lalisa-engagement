@@ -3,59 +3,18 @@
  * Manual sync + auto-fill + sync status display
  */
 
-import { CheckSquare, Link2, Loader2, Pencil, Plus, RefreshCw, Trash2, Upload, Wand2, Clock } from 'lucide-react'
+import { CheckSquare, Layers, Link2, Loader2, Pencil, Plus, RefreshCw, Trash2, Upload, Wand2, Clock } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { PostThumb } from '@/components/ui'
 import { tiersFor } from '@/lib/filters'
 import { formatNum, metricLabel, parsePostUrl, platformLabel, platformMetrics, platforms, postTitle } from '@/lib/platform'
 import { syncPostsFromLinks } from '@/lib/syncHelpers'
-import type { FetchedStats } from '@/lib/statsFetch'
-import { newId, updateData, useSiteData } from '@/lib/store'
+import { updateData, useSiteData } from '@/lib/store'
 import type { Platform, Post, PostKind, Stats } from '@/lib/types'
 import { uploadImage } from '@/lib/upload'
+import { BulkAddPosts } from './BulkAddPosts'
 import { ConfirmButton, Field, inputCls, Panel, SmallBtn } from './fields'
-
-async function fetchLinkStats(url: string, includeCover = true): Promise<FetchedStats> {
-  try {
-    const res = await fetch(`/api/stats?url=${encodeURIComponent(url)}&cover=${includeCover ? '1' : '0'}`)
-    if (!res.ok) throw new Error('Unavailable')
-    return await res.json()
-  } catch {
-    return { stats: {}, missing: [], error: 'Could not reach the platform — try again.' }
-  }
-}
-
-/** Merges fetched numbers into a post, keeping the owner's own values for metrics the platform hides */
-function applyStats(p: Post, r: FetchedStats): Post {
-  const stats: Stats = { ...p.stats }
-  for (const [k, v] of Object.entries(r.stats) as [keyof Stats, number | undefined][]) if (v !== undefined) stats[k] = v
-  return {
-    ...p,
-    platform: r.platform ?? p.platform,
-    account: p.account || r.account || '',
-    title: p.title || r.title,
-    caption: p.caption || r.caption || '',
-    thumbnail: p.kind === 'media' ? undefined : p.thumbnail || r.thumbnail,
-    stats,
-  }
-}
-
-function blankPost(campaignId: string, kind: PostKind): Post {
-  return {
-    id: newId('p'),
-    kind,
-    campaignId,
-    platform: 'ig-post',
-    url: '',
-    account: '',
-    title: '',
-    caption: '',
-    stats: { views: 0, likes: 0, comments: 0, saves: 0, shares: 0, reposts: 0 },
-    commentGoal: kind === 'media' ? undefined : 10_000,
-    communityComments: 0,
-    postedAt: new Date().toISOString().slice(0, 10),
-  }
-}
+import { applyStats, blankPost, fetchLinkStats } from './postHelpers'
 
 export function PostsEditor() {
   const data = useSiteData()
@@ -64,6 +23,7 @@ export function PostsEditor() {
   const [editing, setEditing] = useState<Post | null>(null)
   const [sync, setSync] = useState<{ done: number; total: number; failed: number } | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulk, setBulk] = useState(false)
 
   const list = data.posts.filter((p) => (section === 'media' ? p.kind === 'media' : p.kind !== 'media') && (!campaign || p.campaignId === campaign))
   // Only posts visible in the current list can stay selected
@@ -122,6 +82,7 @@ export function PostsEditor() {
   const syncing = !!sync && sync.done < sync.total
 
   if (editing) return <PostForm initial={editing} onSave={save} onCancel={() => setEditing(null)} />
+  if (bulk) return <BulkAddPosts kind={section === 'media' ? 'media' : 'lisa'} campaignId={campaign || data.campaigns[0]?.id || ''} onDone={() => setBulk(false)} />
 
   return (
     <Panel
@@ -130,6 +91,9 @@ export function PostsEditor() {
         <div className="flex flex-wrap justify-end gap-2">
           <SmallBtn onClick={refreshAll} disabled={syncing || !list.length}>
             {syncing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />} Update numbers for all {list.length} posts
+          </SmallBtn>
+          <SmallBtn onClick={() => setBulk(true)}>
+            <Layers className="size-4" /> Add many links
           </SmallBtn>
           <SmallBtn tone="gold" onClick={() => setEditing(blankPost(campaign || data.campaigns[0]?.id || '', section === 'media' ? 'media' : 'lisa'))}>
             <Plus className="size-4" /> Add post
