@@ -37,9 +37,14 @@ const campaigns: Campaign[] = [
 ]
 
 const tiers: Tier[] = [
-  { id: 't1', name: 'Tier 1 · Global' },
-  { id: 't2', name: 'Tier 2 · Regional' },
-  { id: 't3', name: 'Tier 3 · Fan & Local' },
+  { id: 't1-tiktok', platform: 'tiktok', name: 'Tier 1 · Global' },
+  { id: 't2-tiktok', platform: 'tiktok', name: 'Tier 2 · Fashion & Lifestyle' },
+  { id: 't3-tiktok', platform: 'tiktok', name: 'Tier 3 · Fan & Local' },
+  { id: 't1-ig-post', platform: 'ig-post', name: 'Tier 1 · Global' },
+  { id: 't2-ig-post', platform: 'ig-post', name: 'Tier 2 · Regional' },
+  { id: 't3-ig-post', platform: 'ig-post', name: 'Tier 3 · Fan & Local' },
+  { id: 't1-ig-reel', platform: 'ig-reel', name: 'Tier 1 · Global' },
+  { id: 't2-ig-reel', platform: 'ig-reel', name: 'Tier 2 · Regional' },
 ]
 
 let n = 0
@@ -73,17 +78,17 @@ const posts: Post[] = [
   post({ kind: 'lisa', campaignId: 'lisa-solo', platform: 'tiktok', url: 'https://www.tiktok.com/@lalalalisa_m/video/0000000000000000004', account: '@lalalalisa_m', caption: 'dance challenge 💃', stats: { views: 64_300_000, likes: 9_210_440, comments: 81_220, saves: 520_100, shares: 330_400 }, commentGoal: 120_000 }),
 
   // ── Media · LV SS27
-  post({ kind: 'media', campaignId: 'lvss27', platform: 'ig-post', url: 'https://www.instagram.com/p/SAMPLE-M-1/', account: '@voguemagazine', caption: 'LISA arrives at Louis Vuitton SS27.', tierId: 't1', stats: { likes: 610_220, comments: 4_120, reposts: 1_320, saves: 9_880, shares: 12_440 }, extraMentions: ['@voguemagazine'] }),
-  post({ kind: 'media', campaignId: 'lvss27', platform: 'ig-reel', url: 'https://www.instagram.com/reel/SAMPLE-M-2/', account: '@wwd', caption: 'Front row at LV: LISA.', tierId: 't1', stats: { views: 3_220_100, likes: 402_330, comments: 2_880, reposts: 1_120, saves: 6_330, shares: 9_910 }, extraMentions: ['@wwd'] }),
-  post({ kind: 'media', campaignId: 'lvss27', platform: 'ig-post', url: 'https://www.instagram.com/p/SAMPLE-M-3/', account: '@harpersbazaarus', caption: 'Best dressed at Paris Fashion Week.', tierId: 't1', stats: { likes: 288_440, comments: 1_930, reposts: 640, saves: 4_120, shares: 5_330 }, extraMentions: ['@harpersbazaarus'] }),
-  post({ kind: 'media', campaignId: 'lvss27', platform: 'tiktok', url: 'https://www.tiktok.com/@elleusa/video/0000000000000000005', account: '@elleusa', caption: 'LISA at LV SS27 🔥', tierId: 't2', stats: { views: 2_110_300, likes: 330_220, comments: 3_110, saves: 18_330, shares: 7_440 }, extraMentions: ['@elleusa'] }),
-  post({ kind: 'media', campaignId: 'lvss27', platform: 'ig-post', url: 'https://www.instagram.com/p/SAMPLE-M-4/', account: '@vogue_thailand', caption: 'ลิซ่า ที่งานโชว์ Louis Vuitton', tierId: 't2', stats: { likes: 120_330, comments: 1_210, reposts: 220, saves: 1_880, shares: 2_440 }, extraMentions: ['@vogue_thailand'] }),
-  post({ kind: 'media', campaignId: 'lvss27', platform: 'ig-reel', url: 'https://www.instagram.com/reel/SAMPLE-M-5/', account: '@hypebeast', caption: 'LISA x LV', tierId: 't2', stats: { views: 980_330, likes: 140_220, comments: 980, reposts: 330, saves: 2_210, shares: 3_120 }, extraMentions: ['@hypebeast'] }),
-  post({ kind: 'media', campaignId: 'lvss27', platform: 'tiktok', url: 'https://www.tiktok.com/@fashionnews/video/0000000000000000006', account: '@fashionnews', caption: 'Who wore it best?', tierId: 't3', stats: { views: 420_000, likes: 61_220, comments: 740, saves: 3_100, shares: 1_220 }, extraMentions: ['@fashionnews'] }),
+  post({ kind: 'media', campaignId: 'lvss27', platform: 'ig-post', url: 'https://www.instagram.com/p/SAMPLE-M-1/', account: '@voguemagazine', caption: 'LISA arrives at Louis Vuitton SS27.', tierId: 't1-ig-post', stats: { likes: 610_220, comments: 4_120, reposts: 1_320, saves: 9_880, shares: 12_440 }, extraMentions: ['@voguemagazine'] }),
+  post({ kind: 'media', campaignId: 'lvss27', platform: 'ig-reel', url: 'https://www.instagram.com/reel/SAMPLE-M-2/', account: '@wwd', caption: 'Front row at LV: LISA.', tierId: 't1-ig-reel', stats: { views: 3_220_100, likes: 402_330, comments: 2_880, reposts: 1_120, saves: 6_330, shares: 9_910 }, extraMentions: ['@wwd'] }),
+  post({ kind: 'media', campaignId: 'lvss27', platform: 'ig-post', url: 'https://www.instagram.com/p/SAMPLE-M-3/', account: '@harpersbazaarus', caption: 'Best dressed at Paris Fashion Week.', tierId: 't1-ig-post', stats: { likes: 288_440, comments: 1_930, reposts: 640, saves: 4_120, shares: 5_330 }, extraMentions: ['@harpersbazaarus'] }),
+  post({ kind: 'media', campaignId: 'lvss27', platform: 'tiktok', url: 'https://www.tiktok.com/@elleusa/video/0000000000000000005', account: '@elleusa', caption: 'LISA at LV SS27 🔥', tierId: 't2-tiktok', stats: { views: 2_110_300, likes: 330_220, comments: 3_110, saves: 18_330, shares: 7_440 }, extraMentions: ['@elleusa'] }),
+  post({ kind: 'media', campaignId: 'lvss27', platform: 'ig-post', url: 'https://www.instagram.com/p/SAMPLE-M-4/', account: '@vogue_thailand', caption: 'ลิซ่า ที่งานโชว์ Louis Vuitton', tierId: 't2-ig-post', stats: { likes: 120_330, comments: 1_210, reposts: 220, saves: 1_880, shares: 2_440 }, extraMentions: ['@vogue_thailand'] }),
+  post({ kind: 'media', campaignId: 'lvss27', platform: 'ig-reel', url: 'https://www.instagram.com/reel/SAMPLE-M-5/', account: '@hypebeast', caption: 'LISA x LV', tierId: 't2-ig-reel', stats: { views: 980_330, likes: 140_220, comments: 980, reposts: 330, saves: 2_210, shares: 3_120 }, extraMentions: ['@hypebeast'] }),
+  post({ kind: 'media', campaignId: 'lvss27', platform: 'tiktok', url: 'https://www.tiktok.com/@fashionnews/video/0000000000000000006', account: '@fashionnews', caption: 'Who wore it best?', tierId: 't3-tiktok', stats: { views: 420_000, likes: 61_220, comments: 740, saves: 3_100, shares: 1_220 }, extraMentions: ['@fashionnews'] }),
 
   // ── Media · BVLGARI
-  post({ kind: 'media', campaignId: 'bvlgari', platform: 'ig-post', url: 'https://www.instagram.com/p/SAMPLE-M-6/', account: '@vogueitalia', caption: 'LISA in Bulgari high jewelry.', tierId: 't1', stats: { likes: 330_100, comments: 2_440, reposts: 710, saves: 5_120, shares: 6_210 }, extraMentions: ['@vogueitalia'] }),
-  post({ kind: 'media', campaignId: 'bvlgari', platform: 'tiktok', url: 'https://www.tiktok.com/@ellethailand/video/0000000000000000007', account: '@ellethailand', caption: 'ลิซ่า x บุลการี', tierId: 't3', stats: { views: 610_220, likes: 88_330, comments: 1_020, saves: 4_440, shares: 1_880 }, extraMentions: ['@ellethailand'] }),
+  post({ kind: 'media', campaignId: 'bvlgari', platform: 'ig-post', url: 'https://www.instagram.com/p/SAMPLE-M-6/', account: '@vogueitalia', caption: 'LISA in Bulgari high jewelry.', tierId: 't1-ig-post', stats: { likes: 330_100, comments: 2_440, reposts: 710, saves: 5_120, shares: 6_210 }, extraMentions: ['@vogueitalia'] }),
+  post({ kind: 'media', campaignId: 'bvlgari', platform: 'tiktok', url: 'https://www.tiktok.com/@ellethailand/video/0000000000000000007', account: '@ellethailand', caption: 'ลิซ่า x บุลการี', tierId: 't3-tiktok', stats: { views: 610_220, likes: 88_330, comments: 1_020, saves: 4_440, shares: 1_880 }, extraMentions: ['@ellethailand'] }),
 ]
 
 const lineTypes: LineType[] = [

@@ -1,5 +1,5 @@
 import { getStore } from '@netlify/blobs'
-import type { Platform } from './types'
+import type { Platform, Stats } from './types'
 
 type PostMetadata = {
   title?: string
@@ -14,6 +14,8 @@ type Preview = { title?: string; caption?: string; image?: string; account?: str
 
 // Instagram and TikTok only serve link previews to known crawlers; a plain server fetch gets the login page
 const CRAWLER_UA = 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)'
+// TikTok only embeds a video's full counts in the page it serves to regular browsers
+const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36'
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024
 const IMAGE_HOSTS = ['tiktokcdn.com', 'tiktokcdn-us.com', 'tiktokcdn-eu.com', 'tiktokv.com', 'tiktokv.us', 'ibytedtos.com', 'byteoversea.com', 'muscdn.com', 'cdninstagram.com', 'fbcdn.net', 'instagram.com']
 
@@ -92,11 +94,29 @@ async function readBytes(response: Response, limit: number) {
 const readText = async (response: Response) => new TextDecoder().decode(await readBytes(response, 2_000_000))
 
 /** Fetches a TikTok/Instagram page, following redirects only while they stay on those sites */
-async function fetchPage(initial: URL, signal: AbortSignal) {
+const readText = async (response: Response) => new TextDecoder().decode(await readBytes(response, 2_000_000))
+
+/** Fetches a TikTok/Instagram page, following redirects only while they stay on those sites */
+async function fetchPage(initial: URL, signal: AbortSignal, userAgent = CRAWLER_UA) {
   let url = initial
   for (let redirects = 0; redirects < 5; redirects++) {
     if (!socialPlatform(url)) throw new Error('Unsupported redirect')
-    const response = await fetch(url, { redirect: 'manual', signal, headers: { Accept: 'text/html', 'User-Agent': CRAWLER_UA, 'Accept-Language': 'en' } })
+    const response = await fetch(url, { redirect: 'manual', signal, headers: { Accept: 'text/html', 'User-Agent': userAgent, 'Accept-Language': 'en' } })
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location')
+      await response.body?.cancel()
+      if (!location) throw new Error('Invalid redirect')
+      url = new URL(location, url)
+      continue
+    }
+    if (!response.headers.get('content-type')?.includes('text/html')) {
+      await response.body?.cancel()
+      throw new Error('Unavailable')
+    }
+    return { html: await readText(response), url }
+  }
+  throw new Error('Too many redirects')
+}
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location')
       await response.body?.cancel()
@@ -254,5 +274,61 @@ export async function fetchPostMetadata(rawUrl: string, includeCover = true): Pr
     }
   } catch {
     return { metadataError: 'Could not read a public preview from this link. Enter the title manually; a cover is optional.' }
+  }
+}
+
+/** Reads "1,234" / "1.2K" / "3M" style counts */
+function count(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value !== 'string') return undefined
+  const match = value.trim().replace(/,/g, '').match(/^(\d+(?:\.\d+)?)\s*([kmb])?$/i)
+  if (!match) return undefined
+  const scale = { k: 1e3, m: 1e6, b: 1e9 }[match[2]?.toLowerCase() as 'k' | 'm' | 'b'] ?? 1
+  return Math.round(Number(match[1]) * scale)
+}
+
+function compact(stats: Partial<Record<keyof Stats, number | undefined>>): Partial<Stats> {
+  return Object.fromEntries(Object.entries(stats).filter(([, v]) => v !== undefined)) as Partial<Stats>
+}
+
+/** TikTok video pages carry `"statsV2":{"diggCount":"…","playCount":"…",…}` for the video itself */
+function tiktokCounts(html: string): Partial<Stats> {
+  for (const match of html.matchAll(/"stats(?:V2)?":(\{[^{}]*\})/g)) {
+    try {
+      const s = JSON.parse(match[1]) as Record<string, unknown>
+      if (!('playCount' in s)) continue
+      return compact({ views: count(s.playCount), likes: count(s.diggCount), comments: count(s.commentCount), shares: count(s.shareCount), saves: count(s.collectCount) })
+    } catch {
+      // Keep looking
+    }
+  }
+  return {}
+}
+
+/** Instagram previews describe a post as `1,234 likes, 56 comments - user on …` */
+function instagramCounts(html: string): Partial<Stats> {
+  const meta = readMeta(html)
+  const description = meta['og:description'] || meta['description'] || ''
+  const likes = description.match(/([\d.,]+\s*[KMB]?)\s+likes?\b/i)?.[1]
+  const comments = description.match(/([\d.,]+\s*[KMB]?)\s+comments?\b/i)?.[1]
+  const views = html.match(/"(?:video_view_count|play_count|view_count)":(\d+)/)?.[1]
+  return compact({ likes: count(likes), comments: count(comments), views: count(views) })
+}
+
+/** Public numbers read straight from the post page, used when no metrics service is configured or it misses a number */
+export async function fetchPublicCounts(rawUrl: string): Promise<Partial<Stats>> {
+  try {
+    let url = new URL(rawUrl.trim())
+    let platform = socialPlatform(url)
+    if (!platform) return {}
+    const signal = AbortSignal.timeout(12000)
+    if (platform === 'tiktok' ? !tiktokPost(url) : !instagramCode(url)) {
+      url = await resolveShareLink(url, signal)
+      platform = socialPlatform(url) ?? platform
+    }
+    if (platform === 'tiktok') return tiktokCounts((await fetchPage(url, signal, BROWSER_UA)).html)
+    return instagramCounts((await fetchPage(url, signal)).html)
+  } catch {
+    return {}
   }
 }

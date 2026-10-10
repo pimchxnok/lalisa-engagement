@@ -1,9 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { PostCard } from '@/components/PostCard'
 import { CampaignPicker, EmptyState, GoalBar, PlatformIcon, PlatformTabs, SectionTitle } from '@/components/ui'
-import { filterPosts, validateListSearch } from '@/lib/filters'
+import { filterPosts, tiersFor, validateListSearch } from '@/lib/filters'
 import { formatNum, metricLabel, platformLabel, platforms, sumStats } from '@/lib/platform'
 import { useActivity, useSiteData } from '@/lib/store'
+import type { Platform } from '@/lib/types'
 
 export const Route = createFileRoute('/media/')({
   validateSearch: validateListSearch,
@@ -17,9 +18,9 @@ function MediaPage() {
   const navigate = Route.useNavigate()
   const campaign = search.campaign ?? data.campaigns[0]?.id
   const s = { ...search, campaign }
-  const tierOrder = data.tiers.map((t) => t.id)
   const season = filterPosts(data.posts, 'media', { campaign })
-  const list = filterPosts(data.posts, 'media', s, tierOrder)
+  const list = filterPosts(data.posts, 'media', s, data.tiers)
+  const activePlatform: Platform | undefined = s.platform && s.platform !== 'all' ? s.platform : undefined
   const counts = Object.fromEntries([['all', season.length], ...platforms.map((p) => [p, season.filter((x) => x.platform === p).length])])
   const engaged = season.filter((p) => activity.engaged[p.id]).length
   const shared = season.filter((p) => activity.shared[p.id]).length
@@ -42,7 +43,7 @@ function MediaPage() {
             return (
               <button
                 key={pl}
-                onClick={() => set({ platform: pl })}
+                onClick={() => set({ platform: pl, tier: undefined })}
                 className={`glass rounded-3xl p-5 text-left transition hover:-translate-y-0.5 ${s.platform === pl ? 'ring-2 ring-gold-400' : ''}`}
               >
                 <div className="flex items-center justify-between">
@@ -70,17 +71,31 @@ function MediaPage() {
       </section>
 
       <div className="mt-10 flex flex-col items-center gap-3">
-        <PlatformTabs value={s.platform ?? 'all'} onChange={(p) => set({ platform: p })} counts={counts} />
-        <div className="flex flex-wrap justify-center gap-2">
-          <TierChip on={!s.tier} onClick={() => set({ tier: undefined })} label="All tiers" />
-          {data.tiers.map((t) => (
-            <TierChip
-              key={t.id}
-              on={s.tier === t.id}
-              onClick={() => set({ tier: t.id })}
-              label={`${t.name} · ${season.filter((p) => p.tierId === t.id).length}`}
-            />
-          ))}
+        <PlatformTabs value={s.platform ?? 'all'} onChange={(p) => set({ platform: p, tier: undefined })} counts={counts} />
+        {/* Each platform has its own tiers — "All platforms" shows every platform's row */}
+        <div className="flex flex-col items-center gap-2">
+          {(activePlatform ? [activePlatform] : platforms).map((pl: Platform) => {
+            const tiers = tiersFor(data.tiers, pl)
+            return (
+              <div key={pl} className="flex flex-wrap items-center justify-center gap-2">
+                {!activePlatform && (
+                  <span className="flex w-36 items-center justify-end gap-1.5 text-xs text-gold-600">
+                    <PlatformIcon platform={pl} className="size-3.5" /> {platformLabel[pl]}
+                  </span>
+                )}
+                {activePlatform && <TierChip on={!s.tier} onClick={() => set({ tier: undefined })} label="All tiers" />}
+                {tiers.map((t) => (
+                  <TierChip
+                    key={t.id}
+                    on={s.tier === t.id}
+                    onClick={() => set({ platform: pl, tier: t.id })}
+                    label={`${t.name} · ${season.filter((p) => p.tierId === t.id).length}`}
+                  />
+                ))}
+                {!tiers.length && <span className="text-xs text-gold-500">No tiers set for {platformLabel[pl]} yet</span>}
+              </div>
+            )
+          })}
         </div>
       </div>
 
