@@ -198,7 +198,7 @@ export async function fetchLiveStats(rawUrl: string): Promise<FetchedStats> {
 }
 
 export async function fetchStats(rawUrl: string, includeCover = true): Promise<FetchedStats> {
-<  const [metrics, metadata] = await Promise.all([
+   const [metrics, metadata] = await Promise.all([
     fetchMetrics(rawUrl),
     fetchPostMetadata(rawUrl, includeCover),
   ])
