@@ -257,9 +257,33 @@ export async function fetchLiveStats(rawUrl: string): Promise<FetchedStats> {
 }
 
 export async function fetchStats(rawUrl: string, includeCover = true): Promise<FetchedStats> {
-  const [metrics, metadata] = await Promise.all([
-    fetchLiveStats(rawUrl),
+   const [metrics, metadata] = await Promise.all([
+    fetchMetrics(rawUrl),
     fetchPostMetadata(rawUrl, includeCover),
   ])
-  return { ...metrics, ...metadata, account: metrics.account ?? metadata.account, platform: metadata.platform === 'ig-reel' ? metadata.platform : metrics.platform ?? metadata.platform }
+
+  const stats = { ...metadata.stats, ...metrics.stats }
+  const keys: (keyof Stats)[] = [
+    'views',
+    'likes',
+    'comments',
+    'shares',
+    'saves',
+    'reposts',
+  ]
+  const gotPageNumbers = Object.keys(metadata.stats).length > 0
+
+  return {
+    ...metrics,
+    ...metadata,
+    stats,
+    missing: keys.filter((key) => stats[key] === undefined),
+    // The page itself supplied numbers, so a missing stats service is not an error
+    error: gotPageNumbers ? undefined : metrics.error,
+    account: metrics.account ?? metadata.account,
+    platform:
+      metadata.platform === 'ig-reel'
+        ? metadata.platform
+        : metrics.platform ?? metadata.platform,
+  }
 }
