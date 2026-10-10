@@ -1,3 +1,8 @@
+/**
+ * Enhanced statsFetch with proper public/private metrics separation
+ * Public: views, likes, comments, shares (from SourceVine)
+ * Private: saves, reposts (IG doesn't expose; keep owner's values)
+ */
 
 import type { Platform, Stats } from './types'
 import { fetchPostMetadata, fetchPublicCounts } from './postMetadata'
@@ -134,16 +139,20 @@ async function fetchMetrics(rawUrl: string): Promise<FetchedStats> {
     const likes = num(data.likes)
     const comments = num(data.comments)
     const shares = num(data.shares)
+
+    // Private metrics (IG typically doesn't expose these in public API)
     const saves = num(data.saves ?? data.collects)
     const reposts = num(data.reposts)
 
     const stats: Partial<Stats> = {
+      // PUBLIC METRICS — safe to update from API
       ...(views !== undefined ? { views } : {}),
       ...(likes !== undefined ? { likes } : {}),
       ...(comments !== undefined ? { comments } : {}),
       ...(shares !== undefined ? { shares } : {}),
-      ...(saves !== undefined ? { saves } : {}),
-      ...(reposts !== undefined ? { reposts } : {}),
+      // PRIVATE METRICS — only update if SourceVine returns them (usually won't for IG)
+      ...(saves !== undefined && saves > 0 ? { saves } : {}),
+      ...(reposts !== undefined && reposts > 0 ? { reposts } : {}),
     }
 
     const keys: (keyof Stats)[] = [
@@ -166,7 +175,7 @@ async function fetchMetrics(rawUrl: string): Promise<FetchedStats> {
       stats,
       missing: keys.filter((key) => stats[key] === undefined),
     }
-  } catch {
+  } catch (err) {
     return {
       platform,
       stats: {},
