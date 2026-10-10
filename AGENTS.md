@@ -14,6 +14,8 @@ LISA ENGAGEMENT is a fan engagement hub built with TanStack Start, React 19, Tai
 - List pages keep campaign/platform/kind/tier in URL search params. Detail pages reuse the same `filterPosts` order, which makes "Back" return to the filtered list and makes next/previous follow it.
 - Generator line ids encode style/lang/length/campaign/index (`g:…`), and owner lines use `u:<id>`. Copied ids go into `usedLines` and are skipped. The probe stride 7919 is coprime with every pool size, so every index is reachable.
 - Metrics per platform: TikTok = views/likes/comments/saves/shares. IG Post = likes/comments/reposts/saves/shares. IG Reel = the IG Post set plus views.
+- Tiers are per platform (`Tier.platform`). Media lists rank each post by its position within its own platform's tiers. `store.ts` splits legacy shared tiers into one copy per platform when it loads saved data or imports a backup.
+- Media detail has two tabs: Engagement Post (like + comment) and Share to Story (IG only). Story's main button copies the caption and opens the post in the same tap.
 - LISA/Brand goals are owner-set (`commentGoal`). Media goals use the post's own comment count.
 - The Studio password is checked client-side against a SHA-256 hash for now. Move it server-side in milestone 2.
 - Generated line text is created client-side in effects, which avoids SSR hydration mismatches from randomness.
