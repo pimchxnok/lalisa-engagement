@@ -62,9 +62,22 @@ export function PostsEditor() {
   const [section, setSection] = useState<'own' | 'media'>('own')
   const [campaign, setCampaign] = useState(data.campaigns[0]?.id ?? '')
   const [editing, setEditing] = useState<Post | null>(null)
+  const [selecting, setSelecting] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [sync, setSync] = useState<{ done: number; total: number; failed: number } | null>(null)
 
   const list = data.posts.filter((p) => (section === 'media' ? p.kind === 'media' : p.kind !== 'media') && (!campaign || p.campaignId === campaign))
+  const selectedPosts = list.filter((post) => selectedIds.includes(post.id))
+  const allSelected = list.length > 0 && selectedPosts.length === list.length
+
+  function clearSelection() {
+    setSelecting(false)
+    setSelectedIds([])
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => current.includes(id) ? current.filter((selectedId) => selectedId !== id) : [...current, id])
+  }
 
   function save(p: Post) {
     updateData((d) => ({
@@ -74,8 +87,10 @@ export function PostsEditor() {
     setEditing(null)
   }
 
-  function remove(id: string) {
-    updateData((d) => ({ ...d, posts: d.posts.filter((p) => p.id !== id) }))
+  function remove(ids: string[]) {
+    const removedIds = new Set(ids)
+    updateData((d) => ({ ...d, posts: d.posts.filter((p) => !removedIds.has(p.id)) }))
+    setSelectedIds((current) => current.filter((id) => !removedIds.has(id)))
   }
 
   async function refreshAll() {
@@ -106,6 +121,9 @@ export function PostsEditor() {
       title="Posts"
       action={
         <div className="flex flex-wrap justify-end gap-2">
+          <SmallBtn onClick={() => selecting ? clearSelection() : setSelecting(true)} disabled={!selecting && !list.length}>
+            {selecting ? 'Cancel selection' : 'Select posts'}
+          </SmallBtn>
           <SmallBtn onClick={refreshAll} disabled={syncing || !list.length}>
             {syncing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />} Update numbers for all {list.length} posts
           </SmallBtn>
@@ -136,12 +154,12 @@ export function PostsEditor() {
       <div className="mb-4 flex flex-wrap gap-2">
         <div className="inline-flex rounded-full border border-gold-200 bg-white/50 p-0.5 text-sm">
           {(['own', 'media'] as const).map((s) => (
-            <button key={s} onClick={() => setSection(s)} className={`rounded-full px-4 py-1.5 ${section === s ? 'bg-gold-500 text-white' : 'text-gold-700'}`}>
+            <button key={s} onClick={() => { setSection(s); clearSelection() }} className={`rounded-full px-4 py-1.5 ${section === s ? 'bg-gold-500 text-white' : 'text-gold-700'}`}>
               {s === 'own' ? 'LISA & Brand' : 'Media'}
             </button>
           ))}
         </div>
-        <select value={campaign} onChange={(e) => setCampaign(e.target.value)} className={`${inputCls} w-auto`}>
+        <select value={campaign} onChange={(e) => { setCampaign(e.target.value); clearSelection() }} className={`${inputCls} w-auto`}>
           <option value="">All campaigns</option>
           {data.campaigns.map((c) => (
             <option key={c.id} value={c.id}>
@@ -150,9 +168,36 @@ export function PostsEditor() {
           ))}
         </select>
       </div>
+      {selecting && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gold-200 bg-gold-50/70 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <SmallBtn onClick={() => setSelectedIds(allSelected ? [] : list.map((post) => post.id))} disabled={!list.length}>
+              {allSelected ? 'Deselect all' : 'Select all'}
+            </SmallBtn>
+            <span className="text-sm text-gold-800" role="status">{selectedPosts.length} of {list.length} posts selected</span>
+          </div>
+          <ConfirmButton
+            key={selectedPosts.map((post) => post.id).join(',')}
+            disabled={!selectedPosts.length}
+            onConfirm={() => { remove(selectedPosts.map((post) => post.id)); clearSelection() }}
+            message={`Delete ${selectedPosts.length} selected ${selectedPosts.length === 1 ? 'post' : 'posts'}? This cannot be undone.`}
+          >
+            <Trash2 className="size-3.5" /> Delete selected ({selectedPosts.length})
+          </ConfirmButton>
+        </div>
+      )}
       <ul className="divide-y divide-gold-200/60">
         {list.map((p) => (
-          <li key={p.id} className="flex items-center gap-3 py-3">
+          <li key={p.id} className="flex flex-wrap items-center gap-3 py-3">
+            {selecting && (
+              <input
+                type="checkbox"
+                checked={selectedIds.includes(p.id)}
+                onChange={() => toggleSelected(p.id)}
+                aria-label={`Select ${postTitle(p)} · ${platformLabel[p.platform]}`}
+                className="size-5 shrink-0 cursor-pointer accent-gold-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-500"
+              />
+            )}
             {p.kind !== 'media' && <PostThumb post={p} className="size-14 shrink-0 [&>span]:hidden" />}
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium text-gold-900">
@@ -166,7 +211,7 @@ export function PostsEditor() {
             <SmallBtn onClick={() => setEditing(p)}>
               <Pencil className="size-3.5" /> Edit
             </SmallBtn>
-            <ConfirmButton onConfirm={() => remove(p.id)} message="Delete this post? This cannot be undone.">
+            <ConfirmButton onConfirm={() => remove([p.id])} message="Delete this post? This cannot be undone.">
               <Trash2 className="size-3.5" /> Delete post
             </ConfirmButton>
           </li>

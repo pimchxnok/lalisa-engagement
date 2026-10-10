@@ -4,7 +4,7 @@ import { CommentComposer } from './CommentComposer'
 import { StorySharePanel } from './StorySharePanel'
 import { EngageRibbon } from './EngageStatus'
 import { canShareStory, engageStatus } from '@/lib/engagement'
-import { markCommented, setEngageStatus, useActivity } from '@/lib/store'
+import { markCommented, setEngageStatus, undoCommented, useActivity } from '@/lib/store'
 import type { Campaign, Post } from '@/lib/types'
 
 /** Comment / Share to Story tabs plus the one place to save "I commented" and "I shared to Stories" */
@@ -32,6 +32,12 @@ export function PostEngage({ post, campaign, allowCaption }: { post: Post; campa
   function toggleShared() {
     setEngageStatus(post, { shared: !status.shared })
     toast(status.shared ? 'Story share undone' : 'Story share saved ✓')
+  }
+
+  function undoComment() {
+    if (mine <= 0) return
+    undoCommented(post)
+    toast('One saved comment undone')
   }
 
   return (
@@ -64,7 +70,16 @@ export function PostEngage({ post, campaign, allowCaption }: { post: Post; campa
             >
               <MessageCircle className="size-4" /> {status.commented ? 'Commented ✓ · tap for another' : 'I commented'}
             </button>
-            <span className="text-center text-xs text-gold-700">
+            <button
+              type="button"
+              onClick={undoComment}
+              disabled={mine <= 0}
+              aria-label="Undo one saved comment on this post"
+              className="inline-flex items-center justify-center gap-1.5 self-center rounded-full px-4 py-2 text-xs font-medium text-gold-700 transition-colors hover:bg-gold-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              <Undo2 className="size-3.5" /> Undo comment (−1)
+            </button>
+            <span className="text-center text-xs text-gold-700" aria-live="polite">
               You’ve commented <b>{mine}</b> {mine === 1 ? 'time' : 'times'} on this post
             </span>
           </div>
@@ -88,7 +103,7 @@ export function PostEngage({ post, campaign, allowCaption }: { post: Post; campa
       </section>
 
       {flash && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-full bg-gold-900/90 px-5 py-2.5 text-sm text-white shadow-lg">
+        <div role="status" className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-full bg-gold-900/90 px-5 py-2.5 text-sm text-white shadow-lg">
           {flash}
         </div>
       )}

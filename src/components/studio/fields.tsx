@@ -78,10 +78,12 @@ export function ConfirmButton({
   children,
   onConfirm,
   message = 'Are you sure?',
+  disabled = false,
 }: {
   children: ReactNode
   onConfirm: () => void
   message?: string
+  disabled?: boolean
 }) {
   const [confirming, setConfirming] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -103,7 +105,7 @@ export function ConfirmButton({
       </div>
     </div>
   ) : (
-    <SmallBtn onClick={() => setConfirming(true)}>{children}</SmallBtn>
+    <SmallBtn onClick={() => setConfirming(true)} disabled={disabled}>{children}</SmallBtn>
   )
 }
 
