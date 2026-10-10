@@ -189,6 +189,9 @@ export async function fetchLiveStats(rawUrl: string): Promise<FetchedStats> {
 }
 
 export async function fetchStats(rawUrl: string, includeCover = true): Promise<FetchedStats> {
-  const [metrics, metadata] = await Promise.all([fetchLiveStats(rawUrl), fetchPostMetadata(rawUrl, includeCover)])
+  const [metrics, metadata] = await Promise.all([
+    fetchLiveStats(rawUrl),
+    fetchPostMetadata(rawUrl, includeCover),
+  ])
   return { ...metrics, ...metadata, account: metrics.account ?? metadata.account, platform: metadata.platform === 'ig-reel' ? metadata.platform : metrics.platform ?? metadata.platform }
 }
