@@ -259,7 +259,6 @@ export function CommentComposer({ post, campaign, allowCaption }: { post: Post; 
               : ''}
           Copied lines never appear again for anyone using this device.
         </p>
-        </p>
       </Step>
 
       {mode === 'caption' && (
