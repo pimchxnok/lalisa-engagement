@@ -94,11 +94,6 @@ async function readBytes(response: Response, limit: number) {
 const readText = async (response: Response) => new TextDecoder().decode(await readBytes(response, 2_000_000))
 
 /** Fetches a TikTok/Instagram page, following redirects only while they stay on those sites */
-
-  let url = initial
-  for (let redirects = 0; redirects < 5; redirects++) {
-    if (!socialPlatform(url)) throw new Error('Unsupported redirect')
-    const response = await fetch(url, { redirect: 'manual', signal, headers: { Accept: 'text/html', 'User-Agent': userAgent, 'Accept-Language': 'en' } })
     
   let url = initial
   for (let redirects = 0; redirects < 5; redirects++) {
@@ -126,21 +121,6 @@ async function resolveShareLink(initial: URL, signal: AbortSignal) {
   for (let redirects = 0; redirects < 5; redirects++) {
     if (!socialPlatform(url)) throw new Error('Unsupported redirect')
     const response = await fetch(url, { redirect: 'manual', signal, headers: { Accept: 'text/html', 'User-Agent': userAgent, 'Accept-Language': 'en' } })
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get('location')
-      await response.body?.cancel()
-      if (!location) throw new Error('Invalid redirect')
-      url = new URL(location, url)
-      continue
-    }
-    if (!response.headers.get('content-type')?.includes('text/html')) {
-      await response.body?.cancel()
-      throw new Error('Unavailable')
-    }
-    return { html: await readText(response), url }
-  }
-  throw new Error('Too many redirects')
-}
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location')
       await response.body?.cancel()
