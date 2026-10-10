@@ -151,7 +151,11 @@ async function fetchRetry(url: URL, init: RequestInit) {
 }
 
 /** Fetches a TikTok/Instagram page, following redirects only while they stay on those sites */
-    async function fetchPage(initial: URL, signal: AbortSignal) {
+    async function fetchPage(
+  initial: URL,
+  signal: AbortSignal,
+  userAgent = CRAWLER_UA,
+) {
   let url = initial
   for (let redirects = 0; redirects < 5; redirects++) {
     if (!socialPlatform(url)) throw new Error('Unsupported redirect')
@@ -458,16 +462,6 @@ export async function fetchPostMetadata(rawUrl: string, includeCover = true): Pr
   } catch {
     return { stats: {}, metadataError: 'Could not read a public preview from this link. Enter the title manually; a cover is optional.' }
   }
-}
-
-/** Reads "1,234" / "1.2K" / "3M" style counts */
-function count(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value !== 'string') return undefined
-  const match = value.trim().replace(/,/g, '').match(/^(\d+(?:\.\d+)?)\s*([kmb])?$/i)
-  if (!match) return undefined
-  const scale = { k: 1e3, m: 1e6, b: 1e9 }[match[2]?.toLowerCase() as 'k' | 'm' | 'b'] ?? 1
-  return Math.round(Number(match[1]) * scale)
 }
 
 function compact(stats: Partial<Record<keyof Stats, number | undefined>>): Partial<Stats> {
