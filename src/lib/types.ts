@@ -106,8 +106,12 @@ export type Activity = {
   shared: Record<string, boolean>
   /** Generated / custom line ids that were already copied — never served again */
   usedLines: Record<string, true>
+  /** IG Story "Tags to copy" text the visitor edited, per post */
+  storyDrafts: Record<string, string>
+
   /** Line ids copied on each post, so clearing a post's history frees them again */
   postLines: Record<string, string[]>
+
   /** Where the visitor left off on each post (composer and story box), restored on return */
   drafts: Record<string, PostDraft>
 }

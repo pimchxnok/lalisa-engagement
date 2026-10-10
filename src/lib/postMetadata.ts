@@ -27,7 +27,7 @@ function safeUrl(url: URL) {
   return url.protocol === 'https:' && !url.username && !url.password && !url.port
 }
 
-function socialPlatform(url: URL): Platform | undefined {
+export function socialPlatform(url: URL): Platform | undefined {
   if (!safeUrl(url)) return undefined
   const host = url.hostname.toLowerCase()
   if (host === 'tiktok.com' || host.endsWith('.tiktok.com')) return 'tiktok'
@@ -151,7 +151,7 @@ async function fetchRetry(url: URL, init: RequestInit) {
 }
 
 /** Fetches a TikTok/Instagram page, following redirects only while they stay on those sites */
-    async function fetchPage(
+export async function fetchPage(
   initial: URL,
   signal: AbortSignal,
   userAgent = CRAWLER_UA,
@@ -171,7 +171,7 @@ async function fetchRetry(url: URL, init: RequestInit) {
     }
     if (!response.headers.get('content-type')?.includes('text/html')) {
       await response.body?.cancel()
-      throw new Error('Unavailable')
+      throw new Error('Unavailable') 
     }
     return { html: await readText(response), url }
   }
@@ -179,7 +179,7 @@ async function fetchRetry(url: URL, init: RequestInit) {
 }
 
 /** Follows share links (vt.tiktok.com, tiktok.com/t/…, instagram.com/share/…) to the real post address */
-async function resolveShareLink(initial: URL, signal: AbortSignal) {
+export async function resolveShareLink(initial: URL, signal: AbortSignal) {
   let url = initial
   
   for (let redirects = 0; redirects < 5; redirects++) {
@@ -194,7 +194,7 @@ async function resolveShareLink(initial: URL, signal: AbortSignal) {
   return url
 }
 
-function readMeta(html: string) {
+export function readMeta(html: string) {
   const meta: Record<string, string> = {}
   for (const tag of html.match(/<meta\b[^>]*>/gi) ?? []) {
     const attributes: Record<string, string> = {}
@@ -209,8 +209,11 @@ function readMeta(html: string) {
 
 /** Parses the JSON inside `<script id="…">` */
 function scriptJson(html: string, id: string): unknown {
-  const match = html.match(new RegExp(`<script[^>]*id="${id}"[^>]*>([\\s\\S]*?)</script>`))
+  const match = html.match(
+    new RegExp(`<script[^>]*id="${id}"[^>]*>([\\s\\S]*?)</script>`),
+  )
   if (!match) return undefined
+
   try {
     return JSON.parse(match[1])
   } catch {
@@ -218,12 +221,12 @@ function scriptJson(html: string, id: string): unknown {
   }
 }
 
-function tiktokPost(url: URL) {
+export function tiktokPost(url: URL) {
   const match = url.pathname.match(/\/@([^/]+)\/(video|photo)\/(\d+)/)
   return match ? { user: match[1], kind: match[2], id: match[3] } : undefined
 }
 
-function instagramCode(url: URL) {
+export function instagramCode(url: URL) {
   return url.pathname.match(/\/(p|reel|reels|tv)\/([\w-]+)/)?.[2]
 }
 

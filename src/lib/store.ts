@@ -108,9 +108,10 @@ export function getSiteData() {
   return data
 }
 
-export function getActivity() {
+/** Current activity outside React, e.g. to restore a saved draft once after hydration */
+export function getActivity(): Activity {
   load()
-  return activity
+  return data.activity
 }
 
 export function updateData(fn: (d: SiteData) => SiteData) {
@@ -132,27 +133,48 @@ export function markLineUsed(postId: string, lineId: string) {
   updateActivity((a) => ({
     ...a,
     usedLines: { ...a.usedLines, [lineId]: true },
-    postLines: { ...a.postLines, [postId]: [...new Set([...(a.postLines[postId] ?? []), lineId])] },
+    postLines: {
+      ...a.postLines,
+      [postId]: [...new Set([...(a.postLines[postId] ?? []), lineId])],
+    },
   }))
 }
 
 export function saveDraft(postId: string, patch: PostDraft) {
-  updateActivity((a) => ({ ...a, drafts: { ...a.drafts, [postId]: { ...a.drafts[postId], ...patch } } }))
+  updateActivity((a) => ({
+    ...a,
+    drafts: {
+      ...a.drafts,
+      [postId]: { ...a.drafts[postId], ...patch },
+    },
+  }))
 }
 
 /** Wipes everything this visitor did on one post: comment count, ticks, drafts, and the lines copied there */
 export function clearPostHistory(postId: string) {
   updateActivity((a) => {
-    const drop = <T,>(r: Record<string, T>) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== postId))
+    const drop = <T,>(r: Record<string, T>) =>
+      Object.fromEntries(Object.entries(r).filter(([k]) => k !== postId))
+
     const freed = new Set(a.postLines[postId] ?? [])
-    const stillUsed = new Set(Object.entries(a.postLines).filter(([k]) => k !== postId).flatMap(([, ids]) => ids))
+    const stillUsed = new Set(
+      Object.entries(a.postLines)
+        .filter(([k]) => k !== postId)
+        .flatMap(([, ids]) => ids),
+    )
+
     return {
       myComments: drop(a.myComments),
       engaged: drop(a.engaged),
       shared: drop(a.shared),
-      usedLines: Object.fromEntries(Object.entries(a.usedLines).filter(([id]) => !freed.has(id) || stillUsed.has(id))) as Record<string, true>,
+      usedLines: Object.fromEntries(
+        Object.entries(a.usedLines).filter(
+          ([id]) => !freed.has(id) || stillUsed.has(id),
+        ),
+      ) as Record<string, true>,
       postLines: drop(a.postLines),
       drafts: drop(a.drafts),
+      storyDrafts: drop(a.storyDrafts),
     }
   })
 }

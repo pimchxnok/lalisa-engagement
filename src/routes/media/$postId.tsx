@@ -8,7 +8,7 @@ import { EmptyState, GoalBar, OpenPostLink, StatGrid } from '@/components/ui'
 import { SyncStatusInfo } from '@/components/SyncStatus'
 import { filterPosts, validateListSearch } from '@/lib/filters'
 import { platformLabel, postTitle } from '@/lib/platform'
-import { updateActivity, useActivity, useSiteData } from '@/lib/store'
+import { clearPostHistory, updateActivity, useActivity, useSiteData } from '@/lib/store'
 
 export const Route = createFileRoute('/media/$postId')({
   validateSearch: validateListSearch,
@@ -64,7 +64,6 @@ function MediaDetail() {
 
         </div>
       </div>
-
       {canStory && (
         <div className="glass grid grid-cols-2 gap-1 rounded-full p-1" role="tablist" aria-label="What do you want to do?">
           <ModeTab on={view === 'engage'} onClick={() => setMode('engage')} done={engaged} icon={<Heart className="size-4" />} label="Engagement Post" />
@@ -88,11 +87,18 @@ function MediaDetail() {
               <Check className="size-4" /> {engaged ? 'Engaged — undo' : 'I liked & engaged this post ✓'}
             </button>
           </div>
-          <CommentComposer post={post} campaign={campaign} allowCaption={false} />
+          <CommentComposer key={post.id} post={post} campaign={campaign} allowCaption={false} />
         </>
       ) : (
-        <StorySharePanel post={post} campaign={campaign} />
+        <StorySharePanel key={post.id} post={post} campaign={campaign} />
       )}
+
+      <div className="text-right">
+        <button onClick={() => clearPostHistory(post.id)} className="text-xs text-gold-600 hover:text-rose-600">
+          Clear history for this post
+        </button>
+      </div>
+
       <PostNav list={list} current={post} section="media" search={search} />
     </div>
   )

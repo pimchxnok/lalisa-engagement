@@ -14,6 +14,7 @@ import { Route as StudioRouteImport } from './routes/studio'
 import { Route as TipsRouteImport } from './routes/tips'
 import { Route as ApiStatsRouteImport } from './routes/api/stats'
 import { Route as ApiUploadRouteImport } from './routes/api/upload'
+import { Route as ApiWriteLineRouteImport } from './routes/api/write-line'
 import { Route as MediaIndexRouteImport } from './routes/media/index'
 import { Route as MediaPostIdRouteImport } from './routes/media/$postId'
 import { Route as PostsIndexRouteImport } from './routes/posts/index'
@@ -43,6 +44,11 @@ const ApiStatsRoute = ApiStatsRouteImport.update({
 const ApiUploadRoute = ApiUploadRouteImport.update({
   id: '/api/upload',
   path: '/api/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWriteLineRoute = ApiWriteLineRouteImport.update({
+  id: '/api/write-line',
+  path: '/api/write-line',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MediaIndexRoute = MediaIndexRouteImport.update({
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/tips': typeof TipsRoute
   '/api/stats': typeof ApiStatsRoute
   '/api/upload': typeof ApiUploadRoute
+  '/api/write-line': typeof ApiWriteLineRoute
   '/media/$postId': typeof MediaPostIdRoute
   '/posts/$postId': typeof PostsPostIdRoute
   '/media/': typeof MediaIndexRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByTo {
   '/tips': typeof TipsRoute
   '/api/stats': typeof ApiStatsRoute
   '/api/upload': typeof ApiUploadRoute
+  '/api/write-line': typeof ApiWriteLineRoute
   '/media/$postId': typeof MediaPostIdRoute
   '/posts/$postId': typeof PostsPostIdRoute
   '/media': typeof MediaIndexRoute
@@ -102,6 +110,7 @@ export interface FileRoutesById {
   '/tips': typeof TipsRoute
   '/api/stats': typeof ApiStatsRoute
   '/api/upload': typeof ApiUploadRoute
+  '/api/write-line': typeof ApiWriteLineRoute
   '/media/$postId': typeof MediaPostIdRoute
   '/posts/$postId': typeof PostsPostIdRoute
   '/media/': typeof MediaIndexRoute
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/tips'
     | '/api/stats'
     | '/api/upload'
+    | '/api/write-line'
     | '/media/$postId'
     | '/posts/$postId'
     | '/media/'
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/tips'
     | '/api/stats'
     | '/api/upload'
+    | '/api/write-line'
     | '/media/$postId'
     | '/posts/$postId'
     | '/media'
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/tips'
     | '/api/stats'
     | '/api/upload'
+    | '/api/write-line'
     | '/media/$postId'
     | '/posts/$postId'
     | '/media/'
@@ -153,6 +165,7 @@ export interface RootRouteChildren {
   TipsRoute: typeof TipsRoute
   ApiStatsRoute: typeof ApiStatsRoute
   ApiUploadRoute: typeof ApiUploadRoute
+  ApiWriteLineRoute: typeof ApiWriteLineRoute
   MediaPostIdRoute: typeof MediaPostIdRoute
   PostsPostIdRoute: typeof PostsPostIdRoute
   MediaIndexRoute: typeof MediaIndexRoute
@@ -195,6 +208,13 @@ declare module '@tanstack/react-router' {
       path: '/api/upload'
       fullPath: '/api/upload'
       preLoaderRoute: typeof ApiUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/write-line': {
+      id: '/api/write-line'
+      path: '/api/write-line'
+      fullPath: '/api/write-line'
+      preLoaderRoute: typeof ApiWriteLineRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/media/': {
@@ -241,6 +261,7 @@ const rootRouteChildren: RootRouteChildren = {
   TipsRoute: TipsRoute,
   ApiStatsRoute: ApiStatsRoute,
   ApiUploadRoute: ApiUploadRoute,
+  ApiWriteLineRoute: ApiWriteLineRoute,
   MediaPostIdRoute: MediaPostIdRoute,
   PostsPostIdRoute: PostsPostIdRoute,
   MediaIndexRoute: MediaIndexRoute,
