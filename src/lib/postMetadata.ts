@@ -151,7 +151,7 @@ async function fetchRetry(url: URL, init: RequestInit) {
 }
 
 /** Fetches a TikTok/Instagram page, following redirects only while they stay on those sites */
-async function fetchPage(
+export async function fetchPage(
   initial: URL,
   signal: AbortSignal,
   userAgent = CRAWLER_UA,
