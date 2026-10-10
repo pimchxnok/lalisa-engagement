@@ -1,9 +1,9 @@
 import { ArrowDown, ArrowUp, Download, Plus, RotateCcw, Trash2, Upload } from 'lucide-react'
 import { useState } from 'react'
 import { poolSize } from '@/lib/generator'
-import { tipCategories } from '@/lib/platform'
+import { platformLabel, platforms, tipCategories } from '@/lib/platform'
 import { newId, replaceData, resetData, updateData, useSiteData } from '@/lib/store'
-import type { Campaign, Lang, LineStyle, SiteData, TipCategory } from '@/lib/types'
+import type { Campaign, Lang, LineStyle, Platform, SiteData, TipCategory } from '@/lib/types'
 import { uploadImage } from '@/lib/upload'
 import { ChipInput, ConfirmButton, Field, inputCls, Panel, SmallBtn } from './fields'
 
@@ -61,29 +61,44 @@ export function CampaignsEditor() {
 
 export function TiersEditor() {
   const { tiers, posts } = useSiteData()
-  function move(i: number, dir: -1 | 1) {
+  const [platform, setPlatform] = useState<Platform>('tiktok')
+  const own = tiers.filter((t) => t.platform === platform)
+  // Swap with the neighbouring tier of the same platform; other platforms keep their order
+  function move(id: string, dir: -1 | 1) {
     updateData((d) => {
       const t = [...d.tiers]
-      const j = i + dir
-      if (j < 0 || j >= t.length) return d
+      const i = t.findIndex((x) => x.id === id)
+      let j = i + dir
+      while (j >= 0 && j < t.length && t[j].platform !== platform) j += dir
+      if (i < 0 || j < 0 || j >= t.length) return d
       ;[t[i], t[j]] = [t[j], t[i]]
       return { ...d, tiers: t }
     })
   }
   return (
-    <Panel title="Media tiers" action={<SmallBtn tone="gold" onClick={() => addItem('tiers', { id: newId('t'), name: `Tier ${tiers.length + 1}` })}><Plus className="size-4" /> Add tier</SmallBtn>}>
-      <p className="mb-3 text-sm text-gold-700/80">Media posts are listed in this order. Rename tiers freely — posts keep their tier.</p>
+    <Panel title="Media tiers" action={<SmallBtn tone="gold" onClick={() => addItem('tiers', { id: newId('t'), name: `Tier ${own.length + 1}`, platform })}><Plus className="size-4" /> Add {platformLabel[platform]} tier</SmallBtn>}>
+      <div className="mb-4 inline-flex flex-wrap rounded-full border border-gold-200 bg-white/50 p-0.5 text-sm">
+        {platforms.map((pl) => (
+          <button key={pl} onClick={() => setPlatform(pl)} className={`rounded-full px-4 py-1.5 ${platform === pl ? 'bg-gold-500 text-white' : 'text-gold-700'}`}>
+            {platformLabel[pl]} <span className="text-xs opacity-70">{tiers.filter((t) => t.platform === pl).length}</span>
+          </button>
+        ))}
+      </div>
+      <p className="mb-3 text-sm text-gold-700/80">
+        Every platform has its own tiers. {platformLabel[platform]} media posts are listed in this order. Rename tiers freely — posts keep their tier.
+      </p>
       <ul className="space-y-2">
-        {tiers.map((t, i) => (
+        {own.map((t) => (
           <li key={t.id} className="flex items-center gap-2">
             <input value={t.name} onChange={(e) => patchItem('tiers', t.id, { name: e.target.value })} className={inputCls} />
             <span className="w-20 shrink-0 text-xs text-gold-600">{posts.filter((p) => p.tierId === t.id).length} posts</span>
-            <SmallBtn onClick={() => move(i, -1)}><ArrowUp className="size-3.5" /></SmallBtn>
-            <SmallBtn onClick={() => move(i, 1)}><ArrowDown className="size-3.5" /></SmallBtn>
+            <SmallBtn onClick={() => move(t.id, -1)}><ArrowUp className="size-3.5" /></SmallBtn>
+            <SmallBtn onClick={() => move(t.id, 1)}><ArrowDown className="size-3.5" /></SmallBtn>
             <ConfirmButton onConfirm={() => removeItem('tiers', t.id)} message="Delete this tier? Its posts will be kept without a tier."><Trash2 className="size-3.5" /> Delete tier</ConfirmButton>
           </li>
         ))}
       </ul>
+      {!own.length && <p className="py-4 text-center text-sm text-gold-600">No {platformLabel[platform]} tiers yet — add the first one.</p>}
     </Panel>
   )
 }

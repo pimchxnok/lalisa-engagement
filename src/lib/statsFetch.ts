@@ -1,5 +1,6 @@
 import type { Platform, Stats } from './types'
-import { fetchPage, fetchPostMetadata, instagramCode, readMeta, resolveShareLink, socialPlatform, tiktokPost } from './postMetadata'
+
+import { fetchPage, fetchPostMetadata, fetchPublicCounts, instagramCode, readMeta, resolveShareLink, socialPlatform, tiktokPost } from './postMetadata'
 import { platformMetrics } from './platform'
 
 export type FetchedStats = {
@@ -196,7 +197,19 @@ async function fetchMetrics(rawUrl: string): Promise<FetchedStats> {
   }
 }
 
+const statKeys: (keyof Stats)[] = ['views', 'likes', 'comments', 'shares', 'saves', 'reposts']
+
+/** Metrics service numbers, with any gaps filled from the post's public page */
+export async function fetchLiveStats(rawUrl: string): Promise<FetchedStats> {
+  const metrics = await fetchMetrics(rawUrl)
+  if (!metrics.error && metrics.stats.likes !== undefined && metrics.stats.comments !== undefined && !metrics.missing.some((k) => k === 'views' || k === 'shares' || k === 'saves')) return metrics
+  const counts = await fetchPublicCounts(rawUrl)
+  const stats = { ...counts, ...metrics.stats }
+  const found = Object.keys(stats).length > 0
+  return { ...metrics, stats, missing: statKeys.filter((k) => stats[k] === undefined), error: found ? undefined : metrics.error ?? 'Stats are not available for this link.' }
+}
+
 export async function fetchStats(rawUrl: string, includeCover = true): Promise<FetchedStats> {
-  const [metrics, metadata] = await Promise.all([fetchMetrics(rawUrl), fetchPostMetadata(rawUrl, includeCover)])
+  const [metrics, metadata] = await Promise.all([fetchLiveStats(rawUrl), fetchPostMetadata(rawUrl, includeCover)])
   return { ...metrics, ...metadata, account: metrics.account ?? metadata.account, platform: metadata.platform === 'ig-reel' ? metadata.platform : metrics.platform ?? metadata.platform }
 }
