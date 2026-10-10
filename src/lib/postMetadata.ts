@@ -96,9 +96,34 @@ const readText = async (response: Response) => new TextDecoder().decode(await re
 /** Fetches a TikTok/Instagram page, following redirects only while they stay on those sites */
 const readText = async (response: Response) => new TextDecoder().decode(await readBytes(response, 2_000_000))
 
-/** Fetches a TikTok/Instagram page, following redirects only while they stay on those sites */
-async function fetchPage(initial: URL, signal: AbortSignal, userAgent = CRAWLER_UA) {
   let url = initial
+  for (let redirects = 0; redirects < 5; redirects++) {
+    if (!socialPlatform(url)) throw new Error('Unsupported redirect')
+    const response = await fetch(url, { redirect: 'manual', signal, headers: { Accept: 'text/html', 'User-Agent': userAgent, 'Accept-Language': 'en' } })
+    
+  let url = initial
+  for (let redirects = 0; redirects < 5; redirects++) {
+    if (!socialPlatform(url)) throw new Error('Unsupported redirect')
+    const response = await fetch(url, { redirect: 'manual', signal, headers: { Accept: 'text/html', 'User-Agent': userAgent, 'Accept-Language': 'en' } })
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location')
+      await response.body?.cancel()
+      if (!location) throw new Error('Invalid redirect')
+      url = new URL(location, url)
+      continue
+    }
+    if (!response.headers.get('content-type')?.includes('text/html')) {
+      await response.body?.cancel()
+      throw new Error('Unavailable')
+    }
+    return { html: await readText(response), url }
+  }
+  throw new Error('Too many redirects')
+}
+
+/** Follows share links (vt.tiktok.com, tiktok.com/t/…, instagram.com/share/…) to the real post address */
+async function resolveShareLink(initial: URL, signal: AbortSignal) {
+  let url = initialet url = initial
   for (let redirects = 0; redirects < 5; redirects++) {
     if (!socialPlatform(url)) throw new Error('Unsupported redirect')
     const response = await fetch(url, { redirect: 'manual', signal, headers: { Accept: 'text/html', 'User-Agent': userAgent, 'Accept-Language': 'en' } })
@@ -133,9 +158,6 @@ async function fetchPage(initial: URL, signal: AbortSignal, userAgent = CRAWLER_
   throw new Error('Too many redirects')
 }
 
-/** Follows share links (vt.tiktok.com, tiktok.com/t/…, instagram.com/share/…) to the real post address */
-async function resolveShareLink(initial: URL, signal: AbortSignal) {
-  let url = initial
   for (let redirects = 0; redirects < 5; redirects++) {
     if (!socialPlatform(url)) throw new Error('Unsupported redirect')
     const response = await fetch(url, { method: 'GET', redirect: 'manual', signal, headers: { 'User-Agent': CRAWLER_UA } })
