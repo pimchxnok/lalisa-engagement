@@ -12,7 +12,6 @@ import { filterPosts, tiersFor, validateListSearch } from '@/lib/filters'
 import { formatNum, metricLabel, platformLabel, platforms, sumStats } from '@/lib/platform'
 import { useActivity, useSiteData } from '@/lib/store'
 import type { Platform } from '@/lib/types'
-import { BackLink } from '@/components/PostNav'
 
 
 export const Route = createFileRoute('/media')({
@@ -49,9 +48,9 @@ function MediaList() {
   return (
     <div className="mx-auto max-w-6xl px-5 pt-12">
       <div className="mb-8 flex items-center justify-between">
-        <BackLink campaign={campaign} />
-        <SyncStatusBadge compact />
-      </div>
+  <div />
+  <SyncStatusBadge compact />
+</div>
       <SectionTitle eyebrow="Media dashboard" title="Media Post">
         Every media outlet talking about LISA this season — engage, comment and share them to your story.
       </SectionTitle>
