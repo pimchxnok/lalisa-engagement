@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { Check } from 'lucide-react'
+import { Check, Heart, Send } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
 import { CommentComposer } from '@/components/CommentComposer'
 import { PostNav } from '@/components/PostNav'
 import { StorySharePanel } from '@/components/StorySharePanel'
@@ -19,13 +20,18 @@ function MediaDetail() {
   const search = Route.useSearch()
   const data = useSiteData()
   const activity = useActivity()
+  const [mode, setMode] = useState<'engage' | 'story'>('engage')
   const post = data.posts.find((p) => p.id === postId)
   if (!post) return <div className="mx-auto max-w-3xl px-5 pt-16"><EmptyState>This post no longer exists.</EmptyState></div>
 
   const campaign = data.campaigns.find((c) => c.id === post.campaignId)
   const tier = data.tiers.find((t) => t.id === post.tierId)
-  const list = filterPosts(data.posts, 'media', { ...search, campaign: search.campaign ?? post.campaignId }, data.tiers.map((t) => t.id))
+  const list = filterPosts(data.posts, 'media', { ...search, campaign: search.campaign ?? post.campaignId }, data.tiers)
   const engaged = !!activity.engaged[post.id]
+  const shared = !!activity.shared[post.id]
+  // Story sharing is an Instagram feature, so TikTok posts only have the engage flow
+  const canStory = post.platform !== 'tiktok'
+  const view = canStory ? mode : 'engage'
 
   // For media posts, the "goal" is the current comment count (reflects live/synced data)
   const mediaGoal = post.stats.comments
@@ -45,6 +51,7 @@ function MediaDetail() {
           </div>
           <SyncStatusInfo>{mediaGoal.toLocaleString('en-US')} comments (updated from platform)</SyncStatusInfo>
           <StatGrid platform={post.platform} stats={post.stats} size="sm" />
+          
           <GoalBar done={post.stats.comments} goal={mediaGoal} label="Comments on this media post (live count from platform)" />
           <button
             onClick={() => updateActivity((a) => ({ ...a, engaged: { ...a.engaged, [post.id]: !engaged } }))}
@@ -54,11 +61,53 @@ function MediaDetail() {
           >
             <Check className="size-4" /> {engaged ? 'Engaged — undo' : 'I liked & engaged this post ✓'}
           </button>
+
         </div>
       </div>
-      <CommentComposer post={post} campaign={campaign} allowCaption={false} />
-      {post.platform !== 'tiktok' && <StorySharePanel post={post} campaign={campaign} />}
+
+      {canStory && (
+        <div className="glass grid grid-cols-2 gap-1 rounded-full p-1" role="tablist" aria-label="What do you want to do?">
+          <ModeTab on={view === 'engage'} onClick={() => setMode('engage')} done={engaged} icon={<Heart className="size-4" />} label="Engagement Post" />
+          <ModeTab on={view === 'story'} onClick={() => setMode('story')} done={shared} icon={<Send className="size-4" />} label="Share to Story" />
+        </div>
+      )}
+
+      {view === 'engage' ? (
+        <>
+          <div className="glass flex flex-wrap items-center justify-between gap-3 rounded-3xl p-5 md:px-7">
+            <div>
+              <h2 className="font-display text-2xl font-semibold text-gold-800">Like & engage</h2>
+              <p className="text-sm text-gold-700/80">Like, save and share the post, then add a comment below.</p>
+            </div>
+            <button
+              onClick={() => updateActivity((a) => ({ ...a, engaged: { ...a.engaged, [post.id]: !engaged } }))}
+              className={`inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium shadow ${
+                engaged ? 'bg-white text-emerald-700 border border-emerald-300' : 'bg-emerald-500 text-white hover:bg-emerald-600'
+              }`}
+            >
+              <Check className="size-4" /> {engaged ? 'Engaged — undo' : 'I liked & engaged this post ✓'}
+            </button>
+          </div>
+          <CommentComposer post={post} campaign={campaign} allowCaption={false} />
+        </>
+      ) : (
+        <StorySharePanel post={post} campaign={campaign} />
+      )}
       <PostNav list={list} current={post} section="media" search={search} />
     </div>
+  )
+}
+
+function ModeTab({ on, onClick, done, icon, label }: { on: boolean; onClick: () => void; done: boolean; icon: ReactNode; label: string }) {
+  return (
+    <button
+      role="tab"
+      aria-selected={on}
+      onClick={onClick}
+      className={`flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition-colors ${on ? 'btn-gold' : 'text-gold-800 hover:bg-gold-100/70'}`}
+    >
+      {icon} {label}
+      {done && <Check className={`size-4 ${on ? '' : 'text-emerald-600'}`} aria-label="done" />}
+    </button>
   )
 }
