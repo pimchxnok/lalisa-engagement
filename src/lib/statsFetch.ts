@@ -141,24 +141,35 @@ async function readInstagram(url: URL, signal: AbortSignal): Promise<Metrics> {
 type SourcevineResponse = {
   success?: boolean
   available?: boolean
-  data?: Record<string, number | string | null | undefined> & { channelName?: string }
+  data?: Record<string, number | string | null | undefined>
 }
 
-/** Optional paid provider for the numbers public pages don't show; only used when SOURCEVINE_API_KEY is set */
-export async function readSourcevine(url: URL, platform: Platform, signal: AbortSignal): Promise<Partial<Metrics> | undefined> {
+export type ProviderMetrics = { platform?: Platform; account?: string; caption?: string; stats: Partial<Stats> }
+
+/** The address SourceVine expects: no tracking params, `/reel/` for Reels, `/p/` for posts */
+function sourcevineUrl(url: URL, platform: Platform) {
+  if (platform === 'tiktok') {
+    const post = tiktokPost(url)
+    return post ? `https://www.tiktok.com/@${post.user}/${post.kind}/${post.id}` : url.toString()
+  }
+  const code = instagramCode(url)
+  if (!code) return url.toString()
+  return platform === 'ig-reel' ? `https://www.instagram.com/reel/${code}/` : `https://www.instagram.com/p/${code}/`
+}
+
+/**
+ * SourceVine reads the same numbers the apps show. It is the main source for every platform;
+ * public pages only fill what it leaves out. Only used when SOURCEVINE_API_KEY is set.
+ * TikTok: views, likes, comments, shares, collects (saves). Instagram: views, likes, comments, and saves when public.
+ */
+export async function readSourcevine(url: URL, platform: Platform, signal: AbortSignal): Promise<ProviderMetrics | undefined> {
   // This runs on the server. Never expose this key to browser code.
   const apiKey = process.env.SOURCEVINE_API_KEY
   if (!apiKey) return undefined
+  const sourceUrl = sourcevineUrl(url, platform)
   try {
     const apiUrl = new URL(`https://api.sourcevine.io/v1/${platform === 'tiktok' ? 'tiktok' : 'instagram'}/stats`)
-    const code = platform === 'ig-reel' ? instagramCode(url) : null
-
-const sourceUrl =
-  code
-    ? `https://www.instagram.com/reel/${code}/`
-    : url.toString()
-
-apiUrl.searchParams.set('url', sourceUrl)
+    apiUrl.searchParams.set('url', sourceUrl)
     const response = await fetch(apiUrl, { signal, headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' } })
     // 401/402/429 etc. (bad key, no credits, rate limit) fall back to the public page numbers
     if (!response.ok) {
@@ -167,56 +178,37 @@ apiUrl.searchParams.set('url', sourceUrl)
     }
     const result = (await response.json()) as SourcevineResponse
     const data = result.data
-
     if (result.success !== true || result.available === false || !data) {
       console.warn(`[sourcevine] No stats for ${sourceUrl}`)
       return undefined
     }
-
-    const views = num(data.views)
-    const likes = num(data.likes)
-    const comments = num(data.comments)
-    const shares = num(data.shares)
-
-    // Private metrics (IG typically doesn't expose these in public API)
-    const saves = num(data.saves ?? data.collects)
-    const reposts = num(data.reposts)
-
-    const stats: Partial<Stats> = {
-      // PUBLIC METRICS — safe to update from API
-      ...(views !== undefined ? { views } : {}),
-      ...(likes !== undefined ? { likes } : {}),
-      ...(comments !== undefined ? { comments } : {}),
-      ...(shares !== undefined ? { shares } : {}),
-      // PRIVATE METRICS — only update if SourceVine returns them
-      ...(saves !== undefined && saves > 0 ? { saves } : {}),
-      ...(reposts !== undefined && reposts > 0 ? { reposts } : {}),
-    }
-
-    const keys: (keyof Stats)[] = [
-      'views',
-      'likes',
-      'comments',
-      'shares',
-      'saves',
-      'reposts',
-    ]
-
+    const text = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim().slice(0, 2000) : undefined)
+    const user = text(data.channelName) ?? text(data.username)
     return {
-      account: data.channelName ? `@${data.channelName}` : undefined,
+      // A /p/ link can point at a video; Instagram counts those as Reels
+      platform: platform !== 'tiktok' && data.mediaType === 'video' ? 'ig-reel' : undefined,
+      account: user ? `@${user}` : undefined,
+      caption: text(data.description) ?? text(data.caption),
+      // null means the platform does not publish that number; it is left out, never reported as 0
       stats: compact({
         views: num(data.views),
         likes: num(data.likes),
         comments: num(data.comments),
         shares: num(data.shares),
-        saves: num(data.saves ?? data.collects),
+        saves: num(data.collects ?? data.saves),
         reposts: num(data.reposts),
       }),
     }
-
   } catch {
     return undefined
   }
+}
+
+/** Numbers each platform shows publicly; when SourceVine has all of them the public page is not read at all */
+const publicMetrics: Record<Platform, (keyof Stats)[]> = {
+  tiktok: ['views', 'likes', 'comments', 'shares', 'saves'],
+  'ig-post': ['likes', 'comments'],
+  'ig-reel': ['views', 'likes', 'comments'],
 }
 
 export async function fetchMetrics(rawUrl: string): Promise<FetchedStats> {
@@ -237,31 +229,35 @@ export async function fetchMetrics(rawUrl: string): Promise<FetchedStats> {
   }
 
   const signal = AbortSignal.timeout(15000)
-  let metrics: Metrics | undefined
-
   try {
     if (platform === 'tiktok' ? !tiktokPost(url) : !instagramCode(url)) {
       url = await resolveShareLink(url, signal)
       platform = socialPlatform(url) ?? platform
     }
-    metrics = platform === 'tiktok' ? await readTikTok(url, signal) : await readInstagram(url, signal)
   } catch {
-    // A provider may still have the numbers
+    // Try the link as pasted
   }
 
-  const resolved = metrics?.platform ?? platform
-  // SourceVine numbers are only used for Reels; other platforms keep their public page numbers
-  const provider = resolved === 'ig-reel' ? await readSourcevine(url, resolved, signal) : undefined
+  const provider = await readSourcevine(url, platform, signal)
+  let resolved = provider?.platform ?? platform
+  let metrics: Metrics | undefined
+  if (!provider || publicMetrics[resolved].some((key) => provider.stats[key] === undefined)) {
+    try {
+      metrics = platform === 'tiktok' ? await readTikTok(url, signal) : await readInstagram(url, signal)
+      if (!provider?.platform) resolved = metrics.platform
+    } catch {
+      // SourceVine numbers (if any) are returned below
+    }
+  }
 
-const stats = compact(
-  resolved === 'ig-reel'
-    ? { ...metrics?.stats, ...provider?.stats }
-    : { ...provider?.stats, ...metrics?.stats },
-)
+  // SourceVine wins; the public page only fills gaps
+  const stats = compact({ ...metrics?.stats, ...provider?.stats })
+  if (resolved === 'ig-post') delete stats.views
   const missing = platformMetrics[resolved].filter((key) => stats[key] === undefined)
   return {
     platform: resolved,
-    account: metrics?.account ?? provider?.account,
+    account: provider?.account ?? metrics?.account,
+    caption: provider?.caption,
     stats,
     missing,
     ...(Object.keys(stats).length ? {} : { error: 'This post did not show public numbers (it may be private, age-restricted or deleted). Enter them manually.' }),
@@ -270,12 +266,11 @@ const stats = compact(
 
 const statKeys: (keyof Stats)[] = ['views', 'likes', 'comments', 'shares', 'saves', 'reposts']
 
-/** Metrics service numbers, with any gaps filled from the post's public page */
+/** Metrics service numbers, with the post page's own counts as a last resort when nothing else answered */
 export async function fetchLiveStats(rawUrl: string): Promise<FetchedStats> {
   const metrics = await fetchMetrics(rawUrl)
-  if (!metrics.error && metrics.stats.likes !== undefined && metrics.stats.comments !== undefined && !metrics.missing.some((k) => k === 'views' || k === 'shares' || k === 'saves')) return metrics
-  const counts = await fetchPublicCounts(rawUrl)
-  const stats = { ...counts, ...metrics.stats }
+  if (!metrics.error) return metrics
+  const stats = await fetchPublicCounts(rawUrl)
   const found = Object.keys(stats).length > 0
   return { ...metrics, stats, missing: statKeys.filter((k) => stats[k] === undefined), error: found ? undefined : metrics.error ?? 'Stats are not available for this link.' }
 }
