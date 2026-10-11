@@ -81,7 +81,7 @@ export async function nextLine(r: LineRecipe): Promise<PickedLine | null> {
     const l = customs[Math.floor(Math.random() * customs.length)]
     return { id: `u:${l.id}`, text: fillTemplate(l.text, r.campaign), custom: true }
   }
-  const banked = await pickBankLine({ styleId: r.type.style, lang: r.lang, length: r.length, campaign: r.campaign, used: r.used, exclude: r.exclude })
+  const banked = await pickBankLine({ styleId: r.type.style, system: 'comment', lang: r.lang, length: r.length, campaign: r.campaign, used: r.used, exclude: r.exclude })
   if (banked) return banked
   let fresh = unused(r)
   if (!fresh.length) {

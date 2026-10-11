@@ -54,7 +54,7 @@ export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Cam
       const l = customs[Math.floor(Math.random() * customs.length)]
       return { id: `u:${l.id}`, text: fillTemplate(l.text, campaign), custom: true }
     }
-    const banked = await pickBankLine({ styleId: storyType.style, lang, length: 'short', campaign, used, exclude }).catch(() => null)
+    const banked = await pickBankLine({ styleId: storyType.style, system: 'story', lang, length: 'short', campaign, used, exclude }).catch(() => null)
     return (
       banked ??
       pickLine({ type: storyType, lang, length: 'short', campaign, customLines: data.customLines, used, exclude }) ??
