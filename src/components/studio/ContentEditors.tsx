@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, Download, Plus, RotateCcw, Trash2, Upload } from 'lucide-react'
 import { useState } from 'react'
-import { useStyles } from '@/lib/styles'
+import { allSets, setKey, useStyles, type CommentStyle } from '@/lib/styles'
 import { platformLabel, platforms, tipCategories } from '@/lib/platform'
 import { newId, replaceData, resetData, updateData, useSiteData } from '@/lib/store'
 import type { Campaign, Lang, Platform, SiteData, TipCategory } from '@/lib/types'
@@ -111,6 +111,14 @@ const styles: { id: string; label: string }[] = [
   { id: 'story', label: 'Story caption (short)' },
 ]
 
+/** Where a style's type shows up for visitors in one language, and how many lines are built there */
+function styleHint(style: CommentStyle | undefined, lang: Lang) {
+  if (!style) return 'Style not found — uses the general phrase bank'
+  const on = allSets.filter((x) => x.lang === lang && (style.targets[setKey(x)] ?? 0) > 0)
+  if (!on.length) return `No ${lang === 'en' ? 'English' : 'Thai'} sets turned on`
+  return on.map((x) => `${x.system === 'story' ? 'Story' : 'Comment'} ${x.length}: ${style.counts[setKey(x)] ?? 0}`).join(' · ')
+}
+
 export function LineTypesEditor() {
   const { lineTypes, customLines } = useSiteData()
   const saved = useStyles()
@@ -124,7 +132,8 @@ export function LineTypesEditor() {
       action={<SmallBtn tone="gold" onClick={() => addItem('lineTypes', { id: newId('lt'), name: 'New type', description: '', style: 'sweet' })}><Plus className="size-4" /> Add type</SmallBtn>}
     >
       <p className="mb-4 text-sm text-gold-700/80">
-        Rename types, pick the phrase style that backs each one, and write your own lines. Your lines are served first; the built-in bank supplies 1,000+ unique lines per type and language, and copied lines are never shown again.
+        Rename types, pick the built-in style that backs each one, and write your own lines. A type appears in <b>Write a comment</b> and/or <b>Share to IG Story</b> for each language its style has
+        sets turned on for (see the configuration above). Your lines are served first, then the style&apos;s built lines; copied lines are never shown again.
         Use <code className="text-gold-800">{'{brand}'}</code> and <code className="text-gold-800">{'{campaign}'}</code> to insert the campaign automatically.
       </p>
       <div className="mb-4 inline-flex rounded-full border border-gold-200 bg-white/50 p-0.5 text-sm">
@@ -141,7 +150,7 @@ export function LineTypesEditor() {
             <div key={t.id} className="rounded-2xl border border-gold-200 bg-white/50 p-4 space-y-3">
               <div className="grid gap-3 md:grid-cols-3">
                 <Field label="Type name"><input value={t.name} onChange={(e) => patchItem('lineTypes', t.id, { name: e.target.value })} className={inputCls} /></Field>
-                <Field label="Built-in style" hint={`${saved.find((s) => s.id === t.style)?.counts[`${lang}:${t.style === 'story' ? 'short' : 'medium'}`] ?? 0} saved lines in this style's bank`}>
+                <Field label="Built-in style" hint={styleHint(saved.find((s) => s.id === t.style), lang)}>
                   <select value={t.style} onChange={(e) => patchItem('lineTypes', t.id, { style: e.target.value })} className={inputCls}>
                     {styleOptions.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
                   </select>

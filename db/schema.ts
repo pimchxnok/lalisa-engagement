@@ -142,21 +142,24 @@ export const commentStyles = pgTable('comment_styles', {
   name: text().notNull(),
   keywords: jsonb().$type<string[]>().notNull().default([]),
   prompt: text().notNull().default(''),
-  /** Lines to keep in the bank for each language and length */
+  /** Legacy single bank size for every language and length; `targets` replaced it */
   bankSize: integer('bank_size').notNull().default(50),
+  /** Lines the owner wants in each set, keyed `${system}:${lang}:${length}` (e.g. `comment:en:short`). Sets left out are off. */
+  targets: jsonb().$type<Record<string, number>>().notNull().default({}),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
-/** Pre-written lines for each style, language and length. Random draws from here instead of writing new lines. */
+/** Pre-written lines for each style, system (comment / story), language and length. Random draws from here instead of writing new lines. */
 export const styleLines = pgTable(
   'style_lines',
   {
     id: serial().primaryKey(),
     styleId: text('style_id').notNull(),
+    system: text().notNull().default('comment'),
     lang: text().notNull(),
     length: text().notNull(),
     text: text().notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('style_lines_unique').on(t.styleId, t.lang, t.length, t.text)],
+  (t) => [uniqueIndex('style_lines_unique').on(t.styleId, t.system, t.lang, t.length, t.text)],
 )
