@@ -53,19 +53,30 @@ export const allowedLength = (system: LineSystem, length: LineLength): LineLengt
 const isOn = (style: CommentStyle | undefined, system: LineSystem, lang: Lang, length?: LineLength) =>
   !!style && systemLengths[system].some((l) => (!length || l === length) && (style.targets[setKey({ system, lang, length: l })] ?? 0) > 0)
 
+/** True when the owner configured any set for this system (then visitors only get configured types and sets) */
+const configuredFor = (lineTypes: LineType[], list: CommentStyle[], system: LineSystem) => {
+  const byId = new Map(list.map((s) => [s.id, s]))
+  return lineTypes.some((t) => isOn(byId.get(t.style), system, 'en') || isOn(byId.get(t.style), system, 'th'))
+}
+
+/** Legacy split used before styles load or when nothing is configured: Story-style types for Story, every other type for comments */
+const legacyTypes = (lineTypes: LineType[], system: LineSystem) => lineTypes.filter((t) => (t.style === STORY_STYLE_ID) === (system === 'story'))
+
 /**
- * The visitor-facing types for a system and language, following the owner's set configuration.
- * Before styles load (or when nothing is set up for the language) it falls back to the old split:
- * Story-style types for Story, every other type for comments.
+ * The visitor-facing types for a system and language, following the owner's set configuration: only types whose
+ * style has a set turned on for exactly this system and language. Before styles load (or when nothing at all is set
+ * up for the system) it falls back to the legacy split.
  */
 export function typesFor(lineTypes: LineType[], list: CommentStyle[], system: LineSystem, lang: Lang): LineType[] {
-  const legacy = lineTypes.filter((t) => (t.style === STORY_STYLE_ID) === (system === 'story'))
-  if (!list.length) return legacy
+  if (!list.length || !configuredFor(lineTypes, list, system)) return legacyTypes(lineTypes, system)
   const byId = new Map(list.map((s) => [s.id, s]))
-  const configured = lineTypes.filter((t) => isOn(byId.get(t.style), system, lang))
-  if (configured.length) return configured
-  const otherLang = lineTypes.filter((t) => isOn(byId.get(t.style), system, lang === 'en' ? 'th' : 'en'))
-  return otherLang.length ? otherLang : legacy
+  return lineTypes.filter((t) => isOn(byId.get(t.style), system, lang))
+}
+
+/** Languages that have at least one type in this system (both when nothing is configured yet) */
+export function langsFor(lineTypes: LineType[], list: CommentStyle[], system: LineSystem): Lang[] {
+  const langs = (['en', 'th'] as const).filter((lang) => typesFor(lineTypes, list, system, lang).length)
+  return langs.length ? langs : ['en', 'th']
 }
 
 /** Lengths the owner turned on for a type in this system and language (all of the system's lengths when none are) */
@@ -75,8 +86,14 @@ export function lengthsFor(list: CommentStyle[], styleId: string | undefined, sy
   return on.length ? on : systemLengths[system]
 }
 
+/** Whether this exact set is turned on for the style; visitors then draw only from that set's bank */
+export const setIsOn = (list: CommentStyle[], styleId: string | undefined, set: LineSet) =>
+  isOn(list.find((s) => s.id === styleId), set.system, set.lang, allowedLength(set.system, set.length))
+
 let styles: CommentStyle[] = []
 let loaded = false
+/** True once the first load finished, even when it failed (then visitors get the legacy fallback) */
+let settled = false
 let loading: Promise<void> | null = null
 const listeners = new Set<() => void>()
 const emit = () => listeners.forEach((l) => l())
@@ -93,7 +110,13 @@ export function loadStyles(force = false) {
       emit()
     })
     .catch(() => undefined)
-    .finally(() => (loading = null))
+    .finally(() => {
+      loading = null
+      if (!settled) {
+        settled = true
+        emit()
+      }
+    })
   return loading
 }
 
@@ -109,6 +132,19 @@ export function useStyles() {
     },
     () => styles,
     () => styles,
+  )
+}
+
+/** Whether the style configuration has loaded (or failed to), so visitor panels know which sets are on before drawing */
+export function useStylesSettled() {
+  useEffect(() => void loadStyles(), [])
+  return useSyncExternalStore(
+    (cb) => {
+      listeners.add(cb)
+      return () => listeners.delete(cb)
+    },
+    () => settled,
+    () => false,
   )
 }
 
@@ -135,9 +171,22 @@ export async function saveStyles(next: Omit<CommentStyle, 'counts' | 'story'>[])
   emit()
 }
 
-/** Writes up to `count` (max 25) new lines into exactly one set. Returns how many were added and the set's new size. */
-export async function generateBatch(styleId: string, set: LineSet, count: number): Promise<{ added: number; total: number }> {
-  const result = await ownerFetch('/api/style-lines', { method: 'POST', body: JSON.stringify({ styleId, ...set, count }) })
+/** What one build request did: lines added, the set's size, and why any asked-for lines were not added */
+export type BuildResult = {
+  added: number
+  total: number
+  /** Lines the writer returned that were dropped */
+  skipped: { duplicate: number; offKeyword: number; length: number; invalid: number }
+  /** Asked for fewer than requested because the set is at its maximum size */
+  capped: boolean
+}
+
+/**
+ * Writes up to `count` (max 25) new lines into exactly one set, using `keywords` as the only topic source.
+ * Existing lines are never changed; repeats are skipped and counted in `skipped`.
+ */
+export async function generateBatch(styleId: string, set: LineSet, count: number, keywords: string[]): Promise<BuildResult> {
+  const result = await ownerFetch('/api/style-lines', { method: 'POST', body: JSON.stringify({ styleId, ...set, count, keywords }) })
   banks.delete(bankKey(styleId, set))
   return result
 }

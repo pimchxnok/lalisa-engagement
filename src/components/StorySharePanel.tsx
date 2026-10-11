@@ -6,7 +6,8 @@ import { fillTemplate, pickLine, type PickedLine } from '@/lib/generator'
 import { engageStatus } from '@/lib/engagement'
 import { copyText } from '@/lib/platform'
 import { getActivity, updateActivity, useActivity, useSiteData } from '@/lib/store'
-import { STORY_STYLE_ID, pickBankLine } from '@/lib/styles'
+import { Segmented } from '@/components/ui'
+import { STORY_STYLE_ID, langLabel, langsFor, pickBankLine, setIsOn, typesFor, useStyles, useStylesSettled } from '@/lib/styles'
 import type { Campaign, Lang, LineType, Post } from '@/lib/types'
 
 /** Used when Owner Studio has no type on the Story style (deleted or switched to another style), so Random keeps working */
@@ -21,14 +22,23 @@ const steps = [
 export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Campaign }) {
   const data = useSiteData()
   const activity = useActivity()
-  const storyType = data.lineTypes.find((t) => t.style === STORY_STYLE_ID) ?? builtInStoryType
+  const styles = useStyles()
+  const settled = useStylesSettled()
+  const [langPick, setLang] = useState<Lang>('en')
+  const [typeId, setTypeId] = useState('')
+  // Only the languages and types the owner turned on for "Share to IG Story"; Story captions are always Short
+  const langs = langsFor(data.lineTypes, styles, 'story')
+  const lang = langs.includes(langPick) ? langPick : langs[0]
+  const listed = typesFor(data.lineTypes, styles, 'story', lang)
+  const types = listed.length ? listed : [builtInStoryType]
+  const storyType = types.find((t) => t.id === typeId) ?? types[0]
+  const strict = setIsOn(styles, storyType.style, { system: 'story', lang, length: 'short' })
   const mentions = useMemo(
     () => [...new Set([...(post.extraMentions ?? []), ...(campaign?.mentions ?? [])])],
     [post, campaign],
   )
   const hashtags = campaign?.hashtags ?? []
 
-  const [lang, setLang] = useState<Lang>('en')
   const [line, setLine] = useState<PickedLine | null>(null)
   const [on, setOn] = useState<Record<string, boolean>>({})
   const [box, setBox] = useState('')
@@ -46,7 +56,11 @@ export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Cam
 
   const request = useRef(0)
 
-  /** Owner lines first half the time, then the Story style's saved bank, then the built-in phrase bank */
+  /**
+   * Owner lines first half the time, then the chosen type's Story · language · Short bank. Sets the owner turned on
+   * never mix in other lines; once every caption in the set was copied, one from the same set is served again.
+   * Types without a configured set fall back to the built-in phrase bank.
+   */
   async function pick(exclude?: string): Promise<PickedLine | null> {
     const used = getActivity().usedLines
     const customs = data.customLines.filter((l) => l.typeId === storyType.id && l.lang === lang && !used[`u:${l.id}`] && `u:${l.id}` !== exclude)
@@ -54,16 +68,18 @@ export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Cam
       const l = customs[Math.floor(Math.random() * customs.length)]
       return { id: `u:${l.id}`, text: fillTemplate(l.text, campaign), custom: true }
     }
-    const banked = await pickBankLine({ styleId: storyType.style, system: 'story', lang, length: 'short', campaign, used, exclude }).catch(() => null)
+    const set = { styleId: storyType.style, system: 'story', lang, length: 'short', campaign, exclude } as const
+    const banked = await pickBankLine({ ...set, used }).catch(() => null)
+    if (banked) return banked
+    if (strict) return pickBankLine({ ...set, used: {} }).catch(() => null)
     return (
-      banked ??
       pickLine({ type: storyType, lang, length: 'short', campaign, customLines: data.customLines, used, exclude }) ??
-      // Every caption was copied already: serve one again rather than leaving the box empty
       pickLine({ type: storyType, lang, length: 'short', campaign, customLines: data.customLines, used: {}, exclude })
     )
   }
 
   async function drawLine(exclude?: string) {
+    if (!settled) return
     const n = ++request.current
     const next = await pick(exclude)
     if (n === request.current) setLine(next)
@@ -111,7 +127,7 @@ export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Cam
     }
   }
 
-  useEffect(() => void drawLine(), [post.id, lang])
+  useEffect(() => void drawLine(), [post.id, lang, storyType.id, settled])
   useEffect(() => {
     setOn(Object.fromEntries([...mentions, ...hashtags].map((t) => [t, true])))
     setOpened(false)
@@ -182,16 +198,16 @@ export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Cam
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs uppercase tracking-[0.2em] text-gold-600">Story caption</p>
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => {
-                setLang(lang === 'en' ? 'th' : 'en')
+            <Segmented
+              size="xs"
+              label="Language"
+              value={lang}
+              options={langs.map((id) => ({ id, label: langLabel[id] }))}
+              onChange={(next) => {
+                setLang(next)
                 discardDraft()
               }}
-              className="rounded-full border border-gold-200 bg-white/50 px-3 py-1 text-xs text-gold-700"
-            >
-
-              {lang === 'en' ? 'EN → TH' : 'TH → EN'}
-            </button>
+            />
             <button onClick={roll} className="inline-flex items-center gap-1 rounded-full btn-gold px-3 py-1 text-xs">
               <Dices className="size-3.5" /> Random
             </button>
@@ -205,7 +221,26 @@ export function StorySharePanel({ post, campaign }: { post: Post; campaign?: Cam
             </button>
           </div>
         </div>
-        <div className={`rounded-xl bg-white/60 border border-gold-200 px-4 py-2.5 text-sm ${lang === 'th' ? 'lang-th' : ''}`}>{line?.text ?? '—'}</div>
+        {listed.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {types.map((t) => (
+              <button
+                key={t.id}
+                title={t.description}
+                onClick={() => {
+                  setTypeId(t.id)
+                  discardDraft()
+                }}
+                className={`rounded-full border px-3 py-1 text-xs transition ${t.id === storyType.id ? 'chip-on' : 'border-gold-200 bg-white/50 text-gold-700 hover:border-gold-400'}`}
+              >
+                {t.name}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className={`rounded-xl bg-white/60 border border-gold-200 px-4 py-2.5 text-sm ${lang === 'th' ? 'lang-th' : ''}`}>
+          {line?.text ?? (!settled ? 'Loading captions…' : strict ? 'No captions in this set yet — the owner can build them in Owner Studio.' : '—')}
+        </div>
       </div>
 
       <div>

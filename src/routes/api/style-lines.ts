@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isOwnerPassword } from '@/lib/owner'
-import { clearSet, generateLines, generateSchema, getLines, lineSetQuery } from '@/lib/styles.server'
+import { BuildError, clearSet, generateLines, generateSchema, getLines, lineSetQuery } from '@/lib/styles.server'
 
 /** Reads `system` (defaults to comment, as before sets existed), `lang` and `length` from the query string */
 function setFrom(q: URLSearchParams) {
@@ -29,7 +29,8 @@ export const Route = createFileRoute('/api/style-lines')({
         if (!body.success) return Response.json({ error: 'Invalid request' }, { status: 400 })
         try {
           return Response.json(await generateLines(body.data))
-        } catch {
+        } catch (e) {
+          if (e instanceof BuildError) return Response.json({ error: e.message }, { status: 400 })
           return Response.json({ error: 'The line writer is unavailable right now.' }, { status: 502 })
         }
       },

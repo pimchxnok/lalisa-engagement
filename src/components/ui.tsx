@@ -168,3 +168,19 @@ export function OpenPostLink({ url, children = 'Open post' }: { url: string; chi
 export function EmptyState({ children }: { children: ReactNode }) {
   return <div className="glass rounded-2xl p-10 text-center text-gold-700">{children}</div>
 }
+
+const segmentedSize = { sm: 'text-sm', xs: 'text-xs' }
+
+/** A small pill switch; a plain label when there's only one option */
+export function Segmented<T extends string>({ label, value, options, onChange, size = 'sm' }: { label: string; value: T; options: { id: T; label: string }[]; onChange: (v: T) => void; size?: 'sm' | 'xs' }) {
+  if (options.length < 2) return options[0] ? <span className={`rounded-full border border-gold-200 bg-white/40 px-3 py-1 text-gold-700 ${segmentedSize[size]}`}>{options[0].label}</span> : null
+  return (
+    <div role="group" aria-label={label} className={`inline-flex rounded-full border border-gold-200 bg-white/50 p-0.5 ${segmentedSize[size]}`}>
+      {options.map((o) => (
+        <button key={o.id} onClick={() => onChange(o.id)} className={`rounded-full px-3 py-1 ${value === o.id ? 'bg-gold-500 text-white' : 'text-gold-700'}`}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
