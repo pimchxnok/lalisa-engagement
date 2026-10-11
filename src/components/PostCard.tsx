@@ -3,6 +3,7 @@ import { MessageCircle } from 'lucide-react'
 import { EngageRibbon } from './EngageStatus'
 import { GoalBar, OpenPostLink, PostThumb, StatGrid } from './ui'
 import { engageStatus } from '@/lib/engagement'
+import { getCommentGoal } from '@/lib/goal'
 import type { ListSearch } from '@/lib/filters'
 import { useActivity, useSiteData } from '@/lib/store'
 import type { Post } from '@/lib/types'
@@ -16,8 +17,9 @@ export function PostCard({ post, search }: { post: Post; search: ListSearch }) {
   const isMedia = post.kind === 'media'
   const tier = data.tiers.find((t) => t.id === post.tierId)
 
-  // Media posts use their comment count as the display goal
-  const displayGoal = isMedia ? post.stats.comments : (post.commentGoal ?? 0)
+  // Media posts without an owner-set goal use their comment count as the display goal
+  const displayGoal = isMedia ? getCommentGoal(post) : (post.commentGoal ?? 0)
+  const liveGoal = isMedia && !post.commentGoal
 
   return (
     <article className="glass relative rounded-3xl p-4 pt-9 flex flex-col gap-4">
@@ -44,7 +46,7 @@ export function PostCard({ post, search }: { post: Post; search: ListSearch }) {
         </div>
       </div>
       <StatGrid platform={post.platform} stats={post.stats} size="sm" />
-      <GoalBar done={post.stats.comments} goal={displayGoal} label={isMedia ? 'Comments (live from platform)' : 'Comments on the post vs. goal'} />
+      <GoalBar done={post.stats.comments} goal={displayGoal} label={liveGoal ? 'Comments (live from platform)' : 'Comments on the post vs. goal'} />
       <Link
         to={isMedia ? '/media/$postId' : '/posts/$postId'}
         params={{ postId: post.id }}

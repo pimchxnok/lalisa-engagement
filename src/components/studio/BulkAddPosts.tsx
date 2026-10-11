@@ -49,7 +49,7 @@ export function BulkAddPosts({ kind: initialKind, campaignId: initialCampaign, o
     const next: Row[] = fresh.map((url, i) => {
       const info = parsePostUrl(url)
       const post = { ...blankPost(campaignId, kind), url, platform: info.platform ?? 'ig-post', account: info.account ?? '' }
-      return { key: `${i}-${url}`, post: kind === 'media' ? post : { ...post, commentGoal: goal }, state: 'waiting' }
+      return { key: `${i}-${url}`, post: { ...post, commentGoal: goal || undefined }, state: 'waiting' }
     })
     setRows(next)
     if (!next.length) return
@@ -65,7 +65,7 @@ export function BulkAddPosts({ kind: initialKind, campaignId: initialCampaign, o
           ...cur,
           post: applyStats(cur.post, r),
           state: r.error || !r.title ? 'partial' : 'ready',
-          note: [r.error, !r.error && missing.length ? `${missing.map((m) => metricLabel[m]).join(', ')} not public — edit later` : ''].filter(Boolean).join(' ') || undefined,
+          note: [r.error, r.notice, !r.error && missing.length ? `${missing.map((m) => metricLabel[m]).join(', ')} not public — edit later` : ''].filter(Boolean).join(' ') || undefined,
         }))
       }
     }
@@ -126,21 +126,19 @@ export function BulkAddPosts({ kind: initialKind, campaignId: initialCampaign, o
             ))}
           </select>
         </Field>
-        {kind !== 'media' && (
-          <Field label="Comment goal (each post)">
-            <input
-              type="number"
-              min={0}
-              value={goal}
-              onChange={(e) => {
-                const n = Number(e.target.value)
-                setGoal(n)
-                setRows((cur) => cur.map((r) => ({ ...r, post: { ...r.post, commentGoal: n } })))
-              }}
-              className={`${inputCls} w-full`}
-            />
-          </Field>
-        )}
+        <Field label="Comment goal (each post)" hint={kind === 'media' ? 'Leave at 0 to use each post’s live comment count.' : undefined}>
+          <input
+            type="number"
+            min={0}
+            value={goal}
+            onChange={(e) => {
+              const n = Number(e.target.value)
+              setGoal(n)
+              setRows((cur) => cur.map((r) => ({ ...r, post: { ...r.post, commentGoal: n || undefined } })))
+            }}
+            className={`${inputCls} w-full`}
+          />
+        </Field>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

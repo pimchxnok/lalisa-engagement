@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { PostEngage } from '@/components/PostEngage'
 import { PostNav } from '@/components/PostNav'
-import { EmptyState, OpenPostLink } from '@/components/ui'
+import { EmptyState, GoalBar, OpenPostLink } from '@/components/ui'
 import { filterPosts, validateListSearch } from '@/lib/filters'
 import { platformLabel, postTitle } from '@/lib/platform'
 import { useSiteData } from '@/lib/store'
@@ -33,6 +33,11 @@ function MediaDetail() {
         <h1 className="font-display text-3xl font-semibold text-gold-900">{postTitle(post)}</h1>
         <p className="mt-1 text-gold-800/80">{post.caption}</p>
         <OpenPostLink url={post.url}>Open on {platformLabel[post.platform]}</OpenPostLink>
+        {!!post.commentGoal && (
+          <div className="mt-4">
+            <GoalBar done={post.stats.comments} goal={post.commentGoal} label="Comments on the post vs. goal" />
+          </div>
+        )}
       </div>
       <PostEngage key={post.id} post={post} campaign={campaign} allowCaption={false} />
       <PostNav list={list} current={post} section="media" search={search} />
