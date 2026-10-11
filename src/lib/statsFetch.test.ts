@@ -110,13 +110,16 @@ describe('fetchMetrics for Instagram Reels', () => {
   it('fills only the gaps SourceVine left from the public page', async () => {
     mockFetch(() => json({ success: true, available: true, data: { views: 6953505, likes: null } }))
     const result = await fetchMetrics(REEL)
-    expect(result.stats).toMatchObject({ views: 6953505, likes: 98000, comments: 2001 })
+    // Rounded `98K likes` is not an exact count, so only the exact comment count is filled
+    expect(result.stats).toEqual({ views: 6953505, comments: 2001 })
   })
 
-  it('falls back to public numbers when SourceVine fails', async () => {
-    mockFetch(() => json({ error: 'insufficient credits' }, 402))
+  it('keeps Reel views missing and explains why when SourceVine is out of credits', async () => {
+    mockFetch(() => json({ success: false, error: { code: 'credits_exhausted' } }, 402))
     const result = await fetchMetrics(REEL)
-    expect(result.stats).toMatchObject({ views: 1200000, likes: 98000, comments: 2001 })
+    expect(result.stats).toEqual({ comments: 2001 })
+    expect(result.missing).toContain('views')
+    expect(result.notice).toMatch(/out of credits/)
   })
 
   it('reports metrics as missing, not zero, when no source has them', async () => {

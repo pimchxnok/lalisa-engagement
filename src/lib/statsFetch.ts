@@ -17,6 +17,8 @@ export type FetchedStats = {
   caption?: string
   thumbnail?: string
   metadataError?: string
+  /** Why a number the platform shows could not be read, e.g. the stats service is out of credits */
+  notice?: string
   stats: Partial<Stats>
   missing: (keyof Stats)[]
   error?: string
@@ -169,6 +171,15 @@ type SourcevineResponse = {
   success?: boolean
   available?: boolean
   data?: Record<string, number | string | null | undefined>
+  error?: { code?: string; message?: string }
+}
+
+/** Owner-facing reason when SourceVine answers with an error; the API key itself is never included */
+function sourcevineIssue(status: number, code?: string) {
+  if (status === 402 || code === 'credits_exhausted') return 'SourceVine is out of credits — top up in the SourceVine dashboard to read Reel views.'
+  if (status === 401 || status === 403) return 'SourceVine rejected the API key — check SOURCEVINE_API_KEY.'
+  if (status === 429) return 'SourceVine is rate-limiting requests — try again in a few minutes.'
+  return `SourceVine could not read this post (HTTP ${status}).`
 }
 
 export type ProviderMetrics = { platform?: Platform; account?: string; caption?: string; stats: Partial<Stats> }
@@ -189,7 +200,7 @@ function sourcevineUrl(url: URL, platform: Platform) {
  * public pages only fill what it leaves out. Only used when SOURCEVINE_API_KEY is set.
  * TikTok: views, likes, comments, shares, collects (saves). Instagram: views, likes, comments, and saves when public.
  */
-export async function readSourcevine(url: URL, platform: Platform, signal: AbortSignal): Promise<ProviderMetrics | undefined> {
+export async function readSourcevine(url: URL, platform: Platform, signal: AbortSignal, onIssue?: (message: string) => void): Promise<ProviderMetrics | undefined> {
   // This runs on the server. Never expose this key to browser code.
   const apiKey = process.env.SOURCEVINE_API_KEY
   if (!apiKey) return undefined
@@ -200,7 +211,9 @@ export async function readSourcevine(url: URL, platform: Platform, signal: Abort
     const response = await fetch(apiUrl, { signal, headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' } })
     // 401/402/429 etc. (bad key, no credits, rate limit) fall back to the public page numbers
     if (!response.ok) {
-      console.warn(`[sourcevine] HTTP ${response.status} for ${sourceUrl}`)
+      const code = ((await response.json().catch(() => undefined)) as SourcevineResponse | undefined)?.error?.code
+      console.warn(`[sourcevine] HTTP ${response.status}${code ? ` (${code})` : ''} for ${sourceUrl}`)
+      onIssue?.(sourcevineIssue(response.status, code))
       return undefined
     }
     const result = (await response.json()) as SourcevineResponse
@@ -265,7 +278,8 @@ export async function fetchMetrics(rawUrl: string): Promise<FetchedStats> {
     // Try the link as pasted
   }
 
-  const provider = await readSourcevine(url, platform, signal)
+  let providerIssue: string | undefined
+  const provider = await readSourcevine(url, platform, signal, (message) => (providerIssue = message))
   let resolved = provider?.platform ?? platform
   let metrics: Metrics | undefined
   if (!provider || publicMetrics[resolved].some((key) => provider.stats[key] === undefined)) {
@@ -288,10 +302,13 @@ export async function fetchMetrics(rawUrl: string): Promise<FetchedStats> {
   const stats = compact({ ...metrics?.stats, ...provider?.stats })
   if (resolved === 'ig-post') delete stats.views
   const missing = platformMetrics[resolved].filter((key) => stats[key] === undefined)
+  // Public Instagram pages never show a Reel's real play count, so only SourceVine can supply views
+  const notice = providerIssue ?? (resolved === 'ig-reel' && stats.views === undefined && !process.env.SOURCEVINE_API_KEY ? 'Reel views need SourceVine — set SOURCEVINE_API_KEY.' : undefined)
   return {
     platform: resolved,
     account: provider?.account ?? metrics?.account,
     caption: provider?.caption,
+    notice,
     stats,
     missing,
     ...(Object.keys(stats).length ? {} : { error: 'This post did not show public numbers (it may be private, age-restricted or deleted). Enter them manually.' }),

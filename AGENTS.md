@@ -16,7 +16,8 @@ LISA ENGAGEMENT is a fan engagement hub built with TanStack Start, React 19, Tai
 - Metrics per platform: TikTok = views/likes/comments/saves/shares. IG Post = likes/comments/reposts/saves/shares. IG Reel = the IG Post set plus views.
 - Tiers are per platform (`Tier.platform`). Media lists rank each post by its position within its own platform's tiers. `store.ts` splits legacy shared tiers into one copy per platform when it loads saved data or imports a backup.
 - Media detail has two tabs: Engagement Post (like + comment) and Share to Story (IG only). Story's main button copies the caption and opens the post in the same tap.
-- LISA/Brand goals are owner-set (`commentGoal`). Media goals use the post's own comment count.
+- Comment goals are owner-set (`commentGoal`). A Media post with no goal (0) falls back to its own live comment count.
+- Reel views come only from SourceVine: public IG pages show only the lower 3-second `video_view_count`, which is rejected. SourceVine errors (e.g. 402 out of credits) surface as `FetchedStats.notice` in the Studio.
 - The Studio password is checked client-side against a SHA-256 hash for now. Move it server-side in milestone 2.
 - Generated line text is created client-side in effects, which avoids SSR hydration mismatches from randomness.
 

@@ -21,7 +21,7 @@ export function PostsEditor() {
   const [section, setSection] = useState<'own' | 'media'>('own')
   const [campaign, setCampaign] = useState(data.campaigns[0]?.id ?? '')
   const [editing, setEditing] = useState<Post | null>(null)
-  const [sync, setSync] = useState<{ done: number; total: number; failed: number } | null>(null)
+  const [sync, setSync] = useState<{ done: number; total: number; failed: number; notice?: string } | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulk, setBulk] = useState(false)
 
@@ -63,12 +63,14 @@ export function PostsEditor() {
   async function refreshAll() {
     const targets = list.filter((p) => p.url)
     let failed = 0
+    let notice: string | undefined
     setSync({ done: 0, total: targets.length, failed })
     for (const [i, p] of targets.entries()) {
       const r = await fetchLinkStats(p.url, p.kind !== 'media')
+      notice ??= r.notice
       if (r.error) failed++
       else updateData((d) => ({ ...d, posts: d.posts.map((x) => (x.id === p.id ? applyStats(x, r) : x)) }))
-      setSync({ done: i + 1, total: targets.length, failed })
+      setSync({ done: i + 1, total: targets.length, failed, notice })
     }
     // Update lastSyncedAt after all syncs
     updateData((d) => ({
@@ -116,6 +118,7 @@ export function PostsEditor() {
           {sync.failed > 0 && !syncing && (
             <> {sync.failed} couldn't be read right now — try again later or type those numbers in.</>
           )}
+          {sync.notice && !syncing && <> {sync.notice}</>}
           {!syncing && ' Instagram keeps saves, shares and reposts private, so those keep the numbers you entered.'}
         </p>
       )}
@@ -176,7 +179,7 @@ export function PostsEditor() {
               </p>
               <p className="truncate text-xs text-gold-700/80">
                 {formatNum(p.stats.views ?? p.stats.likes)} {p.stats.views !== undefined && p.platform !== 'ig-post' ? 'views' : 'likes'} · {formatNum(p.stats.comments)} comments
-                {p.kind !== 'media' && ` · goal ${formatNum(p.commentGoal)}`}
+                {(p.kind !== 'media' || !!p.commentGoal) && ` · goal ${formatNum(p.commentGoal)}`}
               </p>
             </div>
             <SmallBtn onClick={() => setEditing(p)}>
@@ -223,6 +226,7 @@ setP((cur) => cur.url === requestUrl ? fitTier(applyStats(cur, r)) : cur)
         fields.length ? `Read ${fields.join(', ')} from the link. Existing edits are kept.` : '',
         r.metadataError,
         r.error,
+        r.notice,
         !r.error && r.missing.length ? `${r.missing.map((key) => metricLabel[key]).join(', ')} not available — you can enter those manually.` : '',
       ]
         .filter(Boolean)
@@ -312,7 +316,7 @@ setP((cur) => cur.url === requestUrl ? fitTier(applyStats(cur, r)) : cur)
             ))}
           </select>
         </Field>
-        {p.kind === 'media' ? (
+        {p.kind === 'media' && (
           <Field label={`${platformLabel[p.platform]} tier`} hint="Tiers are set per platform in Media Tiers.">
             <select value={p.tierId ?? ''} onChange={(e) => set({ tierId: e.target.value || undefined })} className={inputCls}>
               <option value="">No tier</option>
@@ -323,11 +327,10 @@ setP((cur) => cur.url === requestUrl ? fitTier(applyStats(cur, r)) : cur)
               ))}
             </select>
           </Field>
-        ) : (
-          <Field label="Comment goal">
-            <input type="number" min={0} value={p.commentGoal ?? 0} onChange={(e) => set({ commentGoal: Number(e.target.value) })} className={inputCls} />
-          </Field>
         )}
+        <Field label="Comment goal" hint={p.kind === 'media' ? 'Leave at 0 to use the post’s live comment count.' : undefined}>
+          <input type="number" min={0} value={p.commentGoal ?? 0} onChange={(e) => set({ commentGoal: Number(e.target.value) || undefined })} className={inputCls} />
+        </Field>
         <Field label="Post title" hint="Auto-filled when the platform exposes a public preview. You can edit it anytime.">
           <input value={p.title ?? ''} onChange={(e) => set({ title: e.target.value })} placeholder={postTitle(p)} className={inputCls} />
         </Field>
