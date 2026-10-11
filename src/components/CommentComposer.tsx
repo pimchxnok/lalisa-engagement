@@ -3,31 +3,21 @@ import {
   Copy,
   Dices,
   ExternalLink,
-  Languages,
   Loader2,
   Smartphone,
   Sparkles,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { requestAiLine } from '@/lib/aiLine'
-import {
-  formatForPlatform,
-  pickLine,
-  platformLimits,
-  type PickedLine,
-} from '@/lib/generator'
+import { formatForPlatform, platformLimits, type PickedLine } from '@/lib/generator'
 import { nextLine } from '@/lib/lineWriter'
 import { copyText } from '@/lib/platform'
-import { getActivity, getSiteData, markLineUsed, saveDraft, useSiteData } from '@/lib/store'
+import { getActivity, markLineUsed, saveDraft, useSiteData } from '@/lib/store'
+import { Segmented } from '@/components/ui'
+import { allowedLength, langLabel, langsFor, lengthLabel, lengthsFor, setIsOn, typesFor, useStyles, useStylesSettled } from '@/lib/styles'
 import type { Campaign, Lang, LineLength, Platform, Post } from '@/lib/types'
 
 type Mode = 'comment' | 'caption'
-
-const lengths: { id: LineLength; label: string }[] = [
-  { id: 'short', label: 'Short' },
-  { id: 'medium', label: 'Medium' },
-  { id: 'long', label: 'Long' },
-]
 
 /**
  * Render with `key={post.id}` so each post starts from its own saved draft.
@@ -35,11 +25,12 @@ const lengths: { id: LineLength; label: string }[] = [
  */
 export function CommentComposer({ post, campaign, allowCaption, rollSignal = 0 }: { post: Post; campaign?: Campaign; allowCaption: boolean; rollSignal?: number }) {
   const data = useSiteData()
-  const types = data.lineTypes.filter((t) => t.style !== 'story')
+  const styles = useStyles()
+  const settled = useStylesSettled()
 
-  const [typeId, setTypeId] = useState(types[0]?.id ?? '')
-  const [lang, setLang] = useState<Lang>('en')
-  const [length, setLength] = useState<LineLength>('medium')
+  const [typeId, setTypeId] = useState('')
+  const [langPick, setLang] = useState<Lang>('en')
+  const [lengthPick, setLength] = useState<LineLength>('medium')
   const [mode, setMode] = useState<Mode>('comment')
   const [target, setTarget] = useState<Platform>(post.platform)
   const [line, setLine] = useState<PickedLine | null>(null)
@@ -49,7 +40,15 @@ export function CommentComposer({ post, campaign, allowCaption, rollSignal = 0 }
   const [flash, setFlash] = useState('')
   const [writing, setWriting] = useState(false)
 
+  // Only the languages, types and lengths the owner turned on for "Write a comment" in Owner Studio
+  const langs = langsFor(data.lineTypes, styles, 'comment')
+  const lang = langs.includes(langPick) ? langPick : langs[0]
+  const types = typesFor(data.lineTypes, styles, 'comment', lang)
   const type = types.find((t) => t.id === typeId) ?? types[0]
+  const lengths = lengthsFor(styles, type?.style, 'comment', lang)
+  const wanted = allowedLength('comment', lengthPick)
+  const length = lengths.includes(wanted) ? wanted : lengths[lengths.length - 1]
+  const strict = setIsOn(styles, type?.style, { system: 'comment', lang, length })
   const allTags = useMemo(() => [...(campaign?.hashtags ?? []), ...(campaign?.mentions ?? [])], [campaign])
 
   const recipe = [type?.id, lang, length].join('|')
@@ -58,11 +57,11 @@ export function CommentComposer({ post, campaign, allowCaption, rollSignal = 0 }
   const request = useRef(0)
 
   async function roll() {
-    if (!type) return
+    if (!type || !settled) return
     const n = ++request.current
     lastRecipe.current = recipe
     setBusy(true)
-    const next = await nextLine({ type, lang, length, post, campaign, customLines: data.customLines, used: getActivity().usedLines, exclude: line?.id })
+    const next = await nextLine({ type, lang, length, post, campaign, customLines: data.customLines, used: getActivity().usedLines, exclude: line?.id, strict })
     if (n !== request.current) return
     setBusy(false)
     setLine(next)
@@ -93,37 +92,31 @@ export function CommentComposer({ post, campaign, allowCaption, rollSignal = 0 }
     }
   }
 
-  // Restore the saved draft once; otherwise draw a new line when the recipe changes
+  // Restore the saved draft once the set configuration is known; otherwise draw a new line when the recipe changes
   useEffect(() => {
+    if (!settled) return
     if (!restored.current) {
       restored.current = true
       const d = getActivity().drafts[post.id]?.composer
-
-      if (
-        d &&
-        getSiteData().lineTypes.some(
-          (t) => t.id === d.typeId && t.style !== 'story',
-        )
-      ) {
+      const draftLength = d && allowedLength('comment', d.length)
+      const draftType = d && langs.includes(d.lang) ? typesFor(data.lineTypes, styles, 'comment', d.lang).find((t) => t.id === d.typeId) : undefined
+      // Only drafts that still match a turned-on type and length come back; anything else starts fresh
+      if (d && draftLength && draftType && lengthsFor(styles, draftType.style, 'comment', d.lang).includes(draftLength)) {
         setTypeId(d.typeId)
         setLang(d.lang)
-        setLength(d.length)
+        setLength(draftLength)
         setMode(allowCaption ? d.mode : 'comment')
         setTarget(d.target)
         setTagsOn(d.tagsOn)
-        setLine(
-          d.lineId
-            ? { id: d.lineId, text: d.text, custom: !!d.custom }
-            : null,
-        )
+        setLine(d.lineId ? { id: d.lineId, text: d.text, custom: !!d.custom } : null)
         setText(d.text)
-        lastRecipe.current = [d.typeId, d.lang, d.length].join('|')
+        lastRecipe.current = [d.typeId, d.lang, draftLength].join('|')
         return
       }
     }
 
     if (recipe !== lastRecipe.current) void roll()
-  }, [recipe])
+  }, [recipe, settled])
 
   // A logged comment means this line is spent, so offer the next one
   useEffect(() => {
@@ -185,24 +178,10 @@ export function CommentComposer({ post, campaign, allowCaption, rollSignal = 0 }
             </button>
           ))}
         </div>
+        {!types.length && <p className="text-sm text-gold-600">{settled ? 'No comment types are turned on yet.' : 'Loading types…'}</p>}
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-          <div className="inline-flex rounded-full border border-gold-200 bg-white/50 p-0.5">
-            {lengths.map((l) => (
-              <button
-                key={l.id}
-                onClick={() => setLength(l.id)}
-                className={`rounded-full px-3 py-1 ${length === l.id ? 'bg-gold-500 text-white' : 'text-gold-700'}`}
-              >
-                {l.label}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={() => setLang(lang === 'en' ? 'th' : 'en')}
-            className="inline-flex items-center gap-1.5 rounded-full border border-gold-200 bg-white/50 px-3 py-1 text-gold-700 hover:border-gold-400"
-          >
-            <Languages className="size-4" /> {lang === 'en' ? 'EN → TH' : 'TH → EN'}
-          </button>
+          <Segmented label="Language" value={lang} options={langs.map((id) => ({ id, label: langLabel[id] }))} onChange={setLang} />
+          <Segmented label="Length" value={length} options={lengths.map((id) => ({ id, label: lengthLabel[id] }))} onChange={setLength} />
           <button
             onClick={() => setTarget(target === 'tiktok' ? 'ig-post' : 'tiktok')}
             className="inline-flex items-center gap-1.5 rounded-full border border-gold-200 bg-white/50 px-3 py-1 text-gold-700 hover:border-gold-400"
@@ -219,7 +198,13 @@ export function CommentComposer({ post, campaign, allowCaption, rollSignal = 0 }
             onChange={(e) => setText(e.target.value)}
             rows={4}
             className={`w-full rounded-2xl border border-gold-200 bg-white/70 p-4 pr-28 text-[15px] leading-relaxed focus:outline-none focus:ring-2 focus:ring-gold-300 ${lang === 'th' ? 'lang-th' : ''}`}
-            placeholder={busy ? 'Writing a line for this post…' : 'All lines of this type have been used — add more in Owner Studio.'}
+            placeholder={
+              busy || !settled
+                ? 'Writing a line for this post…'
+                : strict
+                  ? 'Every line in this set has been used — the owner can build more in Owner Studio.'
+                  : 'All lines of this type have been used — add more in Owner Studio.'
+            }
           />
           <div className="absolute right-3 top-3 flex flex-col items-stretch gap-1.5">
             <button

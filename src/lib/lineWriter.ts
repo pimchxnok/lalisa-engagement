@@ -3,7 +3,8 @@
  * Lines are fetched in small batches from /api/lines and kept per (type, language, length, post) in memory.
  * Ids are `a:<hash>` so copied lines join `usedLines` like generated (`g:`) and owner (`u:`) lines.
  * Before any of that, Random draws from the chosen style's pre-written bank (lib/styles.ts); the AI pool and
- * the built-in phrase bank in generator.ts only take over when that bank is empty or used up.
+ * the built-in phrase bank in generator.ts only take over when that bank is empty or used up, and only for types
+ * whose set the owner hasn't turned on (configured sets never mix in lines from anywhere else).
  */
 import { fillTemplate, pickLine, type PickedLine } from './generator'
 import { pickBankLine } from './styles'
@@ -18,6 +19,8 @@ export type LineRecipe = {
   customLines: CustomLine[]
   used: Record<string, true>
   exclude?: string
+  /** The owner turned this exact set on: serve only its bank (and the type's own lines), never other sources */
+  strict?: boolean
 }
 
 const pools = new Map<string, string[]>()
@@ -74,7 +77,7 @@ function unused(r: LineRecipe) {
   return (pools.get(key(r)) ?? []).filter((t) => !r.used[writtenLineId(t)] && writtenLineId(t) !== r.exclude)
 }
 
-/** Next line for a recipe: owner lines first half the time, then the style's bank, then AI-written lines, then the built-in phrase bank */
+/** Next line for a recipe: owner lines first half the time, then the style's bank, then (unconfigured sets only) AI-written lines and the built-in phrase bank */
 export async function nextLine(r: LineRecipe): Promise<PickedLine | null> {
   const customs = r.customLines.filter((l) => l.typeId === r.type.id && l.lang === r.lang && !r.used[`u:${l.id}`] && `u:${l.id}` !== r.exclude)
   if (customs.length && Math.random() < 0.5) {
@@ -82,7 +85,7 @@ export async function nextLine(r: LineRecipe): Promise<PickedLine | null> {
     return { id: `u:${l.id}`, text: fillTemplate(l.text, r.campaign), custom: true }
   }
   const banked = await pickBankLine({ styleId: r.type.style, system: 'comment', lang: r.lang, length: r.length, campaign: r.campaign, used: r.used, exclude: r.exclude })
-  if (banked) return banked
+  if (banked || r.strict) return banked
   let fresh = unused(r)
   if (!fresh.length) {
     await fill(r)

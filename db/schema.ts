@@ -1,5 +1,6 @@
 
-import { index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
+import { check, index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 
 // ── Site content (edited from Owner Studio). `position` keeps the owner's order.
 
@@ -161,5 +162,9 @@ export const styleLines = pgTable(
     text: text().notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('style_lines_unique').on(t.styleId, t.system, t.lang, t.length, t.text)],
+  (t) => [
+    uniqueIndex('style_lines_unique').on(t.styleId, t.system, t.lang, t.length, t.text),
+    // Only real sets: comment Short / Medium and story Short, in English or Thai
+    check('style_lines_valid_set', sql`${t.lang} IN ('en', 'th') AND ((${t.system} = 'comment' AND ${t.length} IN ('short', 'medium')) OR (${t.system} = 'story' AND ${t.length} = 'short'))`),
+  ],
 )

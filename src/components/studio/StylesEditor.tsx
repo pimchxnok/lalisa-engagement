@@ -14,6 +14,7 @@ import {
   systemLabel,
   systemLengths,
   useStyles,
+  type BuildResult,
   type CommentStyle,
   type LineSet,
   type LineSystem,
@@ -24,7 +25,7 @@ import { ConfirmButton, Field, inputCls, Panel, SmallBtn } from './fields'
 type Draft = Omit<CommentStyle, 'counts' | 'story'>
 
 /** Lines asked for per request, kept small so each request finishes well within the server time limit */
-const batchSize: Record<LineLength, number> = { short: 20, medium: 15, long: 10 }
+const batchSize: Record<LineLength, number> = { short: 20, medium: 15, long: 15 }
 const MAX_LINES = 2000
 /** New styles start with English and Thai comment sets; the owner changes them before building anything */
 const newTargets = () => ({ 'comment:en:short': 50, 'comment:en:medium': 50, 'comment:th:short': 50, 'comment:th:medium': 50 })
@@ -48,7 +49,7 @@ export function StylesEditor() {
   const [saving, setSaving] = useState(false)
   const [progress, setProgress] = useState<Progress | null>(null)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
+  const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null)
   const stop = useRef(false)
 
   // Follow the server copy until the owner starts editing
@@ -89,7 +90,7 @@ export function StylesEditor() {
 
   async function run(job: () => Promise<void>) {
     setError('')
-    setNotice('')
+    setNotice(null)
     try {
       await job()
     } catch (e) {
@@ -99,31 +100,57 @@ export function StylesEditor() {
     }
   }
 
-  /** Adds `count` new lines to exactly one set of one style, a batch at a time. Other sets are never touched. */
-  async function buildSet(id: string, set: LineSet, count: number) {
+  /**
+   * Adds `count` new lines to exactly one set of one style, a batch at a time, writing only from `keywords`
+   * (the style's saved keywords unless the build names its own). Other sets are never touched. When fewer lines
+   * than asked for are added, the notice says how many and why instead of reporting success.
+   */
+  async function buildSet(id: string, set: LineSet, count: number, keywords?: string[]) {
     if (dirty) await save()
     await loadStyles(true)
     const style = getStyles().find((s) => s.id === id)
     if (!style) throw new Error('Save the style before building lines for it.')
+    const words = keywords ?? style.keywords
+    if (!words.length) throw new Error(`Add keywords to ${style.name} first — lines are written only from your keywords.`)
     const key = setKey(set)
     const name = `${style.name} · ${setName(set)}`
     stop.current = false
     let added = 0
     let total = style.counts[key] ?? 0
     let stalls = 0
-    while (added < count && stalls < 3 && !stop.current && total < MAX_LINES) {
+    let capped = false
+    let failure = ''
+    const skipped: BuildResult['skipped'] = { duplicate: 0, offKeyword: 0, length: 0, invalid: 0 }
+    while (added < count && stalls < 3 && !stop.current && !capped) {
       setProgress({ id, key, text: `Writing ${name}: ${added}/${count} new (${total} in set)` })
-      const r = await generateBatch(id, set, Math.min(batchSize[set.length], count - added))
+      let r: BuildResult
+      try {
+        r = await generateBatch(id, set, Math.min(batchSize[set.length], count - added), words)
+      } catch (e) {
+        failure = e instanceof Error ? e.message : 'The line writer stopped responding.'
+        break
+      }
       added += r.added
       total = r.total
-      // Lines that duplicate the set are skipped, so a few empty batches in a row means the topic is saturated
+      capped = r.capped || total >= MAX_LINES
+      for (const k of Object.keys(skipped) as (keyof typeof skipped)[]) skipped[k] += r.skipped[k]
+      // A few batches in a row with nothing new means the keywords are used up
       stalls = r.added ? 0 : stalls + 1
     }
     await loadStyles(true)
-    setNotice(
-      `${name}: added ${added} new line${added === 1 ? '' : 's'} (${total} in set).` +
-        (added < count ? (stop.current ? ' Stopped.' : ' The writer kept repeating existing lines — add keywords or widen the prompt for more variety.') : ''),
-    )
+    const summary = `${name}: added ${added} of ${count} requested line${count === 1 ? '' : 's'} (${total} in set).`
+    if (added >= count) return setNotice({ tone: 'ok', text: summary })
+    const reasons = [
+      failure && `the writer failed (${failure})`,
+      stop.current && 'you stopped the build',
+      capped && `the set reached its ${MAX_LINES}-line limit`,
+      skipped.duplicate && `${skipped.duplicate} repeated lines already saved`,
+      skipped.offKeyword && `${skipped.offKeyword} didn't use any of the keywords`,
+      skipped.length && `${skipped.length} were not ${lengthLabel[set.length]} length`,
+      skipped.invalid && `${skipped.invalid} were unusable (no "LISA" or empty)`,
+      stalls >= 3 && 'the keywords ran out of new lines — add more keywords for more variety',
+    ].filter(Boolean)
+    setNotice({ tone: 'warn', text: `Incomplete — ${summary} ${count - added} not added: ${reasons.join('; ') || 'the writer returned too few lines'}.` })
   }
 
   const busy = saving || !!progress
@@ -141,7 +168,7 @@ export function StylesEditor() {
         busy={busy}
         progress={progress}
         stopBtn={stopBtn}
-        onBuild={(id, set, count) => void run(() => buildSet(id, set, count))}
+        onBuild={(id, set, count, keywords) => void run(() => buildSet(id, set, count, keywords))}
       />
 
       <Panel
@@ -163,7 +190,7 @@ export function StylesEditor() {
           lowering a number never deletes lines.
         </p>
         {error && <p className="rounded-2xl bg-rose-50 px-4 py-2 text-sm text-rose-700">{error}</p>}
-        {notice && <p className="rounded-2xl bg-emerald-50 px-4 py-2 text-sm text-emerald-800">{notice}</p>}
+        {notice && <p className={`rounded-2xl px-4 py-2 text-sm ${notice.tone === 'ok' ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-900'}`}>{notice.text}</p>}
         {!saved.length && <p className="py-4 text-center text-sm text-gold-600">Loading styles…</p>}
         <div className="space-y-5">
           {drafts.map((d, i) => {
@@ -305,15 +332,19 @@ function SetBuilder({
   busy: boolean
   progress: Progress | null
   stopBtn: React.ReactNode
-  onBuild: (id: string, set: LineSet, count: number) => void
+  onBuild: (id: string, set: LineSet, count: number, keywords: string[]) => void
 }) {
   const [system, setSystem] = useState<LineSystem>('comment')
   const [lang, setLang] = useState<Lang>('en')
   const [styleId, setStyleId] = useState('')
   const [length, setLength] = useState<LineLength>('short')
   const [count, setCount] = useState(20)
+  /** This build's keywords; they start as the style's saved ones and edits here don't change the style */
+  const [keywords, setKeywords] = useState<string[] | null>(null)
 
   const style = styles.find((s) => s.id === styleId) ?? styles[0]
+  const savedKeywords = drafts.find((d) => d.id === style?.id)?.keywords ?? style?.keywords ?? []
+  const words = keywords ?? savedKeywords
   const len = systemLengths[system].includes(length) ? length : 'short'
   const set: LineSet = { system, lang, length: len }
   const key = setKey(set)
@@ -334,14 +365,22 @@ function SetBuilder({
   return (
     <Panel title="Build a set">
       <p className="text-sm text-gold-700/80">
-        Writes new lines for the one set you pick — for example <b>Write a comment · English · Short · 100 lines</b> — using that style&apos;s keywords and prompt. No other language, length or
-        type is built. Lines already in the set stay, and repeats are skipped, so you can build more later.
+        Writes new lines for the one set you pick — for example <b>Write a comment · English · Short · 100 lines</b> — built only from the keywords below, in the tone of the style&apos;s prompt.
+        No other language, length or type is built. Saved lines are never changed and repeats are skipped; if fewer lines than asked for are added, you&apos;ll see how many and why.
       </p>
       <div className="grid gap-3 md:grid-cols-2">
         <Field label="System">{seg(system, (['comment', 'story'] as const).map((id) => ({ id, label: systemLabel[id] })), setSystem)}</Field>
         <Field label="Language">{seg(lang, (['en', 'th'] as const).map((id) => ({ id, label: langLabel[id] })), setLang)}</Field>
         <Field label="Type (style)">
-          <select value={style?.id ?? ''} disabled={busy || !styles.length} onChange={(e) => setStyleId(e.target.value)} className={inputCls}>
+          <select
+            value={style?.id ?? ''}
+            disabled={busy || !styles.length}
+            onChange={(e) => {
+              setStyleId(e.target.value)
+              setKeywords(null)
+            }}
+            className={inputCls}
+          >
             {styles.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </Field>
@@ -349,9 +388,19 @@ function SetBuilder({
         <Field label="New lines to write" hint={`This set has ${have} line${have === 1 ? '' : 's'}${target ? ` · ${target} wanted in the configuration` : ' · not turned on yet (building turns it on)'}`}>
           <input type="number" min={1} max={MAX_LINES} value={count} disabled={busy} onChange={(e) => setCount(Number(e.target.value))} className={`${inputCls} w-32`} />
         </Field>
+        <div className="md:col-span-2">
+          <Field label="Keywords for this build" hint="The only subject matter the writer may use — every line contains at least one of them. Starts from the style's keywords; changes here apply to this build only.">
+            <KeywordInput value={words} onChange={setKeywords} />
+          </Field>
+          {keywords && (
+            <button type="button" onClick={() => setKeywords(null)} className="mt-1 text-xs text-gold-600 underline-offset-2 hover:underline">
+              Use the style&apos;s keywords again
+            </button>
+          )}
+        </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <SmallBtn tone="gold" disabled={busy || !style || n < 1} onClick={() => style && onBuild(style.id, set, n)}>
+        <SmallBtn tone="gold" disabled={busy || !style || n < 1 || !words.length} onClick={() => style && onBuild(style.id, set, n, words)}>
           <Hammer className="size-4" /> Build {n} · {style?.name ?? '…'} · {setName(set)}
         </SmallBtn>
         {target > have && !busy && (
