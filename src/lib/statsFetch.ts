@@ -138,6 +138,33 @@ async function readInstagram(url: URL, signal: AbortSignal): Promise<Metrics> {
   return { platform, stats: compact(stats) }
 }
 
+/** Plain whole numbers only: `1,184,362` counts, `1.2M` is a rounded label and is rejected */
+function exactText(value?: string) {
+  return value && /^\d[\d,]*$/.test(value.trim()) ? Number(value.replace(/,/g, '')) : undefined
+}
+
+/**
+ * Reel fallback when SourceVine has no answer. Only exact counts are kept: the embed page's
+ * like and comment counts match the app, and views are taken only from a real play count.
+ * `video_view_count` (an older 3-second count, often a fifth of the plays the app shows) and
+ * rounded preview text are never used, so a missing number stays missing instead of wrong.
+ */
+async function readInstagramReel(url: URL, signal: AbortSignal): Promise<Metrics> {
+  const code = instagramCode(url)
+  if (!code) throw new Error('No post code')
+  const { html } = await fetchPage(new URL(`https://www.instagram.com/p/${code}/embed/captioned/`), signal)
+  return {
+    platform: 'ig-reel',
+    stats: compact({
+      likes: jsonCount(html, ['edge_liked_by', 'edge_media_preview_like', 'like_count']) ?? exactText(html.match(/>\s*([\d,]+)\s+likes?\s*</i)?.[1]),
+      comments:
+        jsonCount(html, ['edge_media_to_comment', 'edge_media_to_parent_comment', 'comment_count']) ??
+        exactText(html.match(/>\s*View all\s+([\d,]+)\s+comments?\s*</i)?.[1]),
+      views: jsonCount(html, ['video_play_count', 'ig_play_count', 'play_count']),
+    }),
+  }
+}
+
 type SourcevineResponse = {
   success?: boolean
   available?: boolean
@@ -243,7 +270,14 @@ export async function fetchMetrics(rawUrl: string): Promise<FetchedStats> {
   let metrics: Metrics | undefined
   if (!provider || publicMetrics[resolved].some((key) => provider.stats[key] === undefined)) {
     try {
-      metrics = platform === 'tiktok' ? await readTikTok(url, signal) : await readInstagram(url, signal)
+      if (platform === 'tiktok') metrics = await readTikTok(url, signal)
+      else if (resolved === 'ig-reel') metrics = await readInstagramReel(url, signal)
+      else {
+        const post = await readInstagram(url, signal)
+        // A /p/ link that turns out to be a video is a Reel; read its numbers the exact way
+        if (post.platform === 'ig-reel') resolved = 'ig-reel'
+        metrics = post.platform === 'ig-reel' ? await readInstagramReel(url, signal) : post
+      }
       if (!provider?.platform) resolved = metrics.platform
     } catch {
       // SourceVine numbers (if any) are returned below
@@ -269,7 +303,8 @@ const statKeys: (keyof Stats)[] = ['views', 'likes', 'comments', 'shares', 'save
 /** Metrics service numbers, with the post page's own counts as a last resort when nothing else answered */
 export async function fetchLiveStats(rawUrl: string): Promise<FetchedStats> {
   const metrics = await fetchMetrics(rawUrl)
-  if (!metrics.error) return metrics
+  // The post page only has rounded Reel numbers (`1M likes`); a Reel keeps its last exact numbers instead
+  if (!metrics.error || metrics.platform === 'ig-reel') return metrics
   const stats = await fetchPublicCounts(rawUrl)
   const found = Object.keys(stats).length > 0
   return { ...metrics, stats, missing: statKeys.filter((k) => stats[k] === undefined), error: found ? undefined : metrics.error ?? 'Stats are not available for this link.' }
@@ -281,7 +316,10 @@ export async function fetchStats(rawUrl: string, includeCover = true): Promise<F
     fetchPostMetadata(rawUrl, includeCover),
   ])
 
-  const stats = { ...metadata.stats, ...metrics.stats }
+  const platform = metadata.platform === 'ig-reel' ? metadata.platform : metrics.platform ?? metadata.platform
+  // Preview numbers for Reels include the lower `video_view_count` and rounded counts; Reels use the exact metrics only
+  const pageStats = platform === 'ig-reel' ? {} : metadata.stats
+  const stats = { ...pageStats, ...metrics.stats }
   const keys: (keyof Stats)[] = [
     'views',
     'likes',
@@ -290,7 +328,7 @@ export async function fetchStats(rawUrl: string, includeCover = true): Promise<F
     'saves',
     'reposts',
   ]
-  const gotPageNumbers = Object.keys(metadata.stats).length > 0
+  const gotPageNumbers = Object.keys(pageStats).length > 0
 
   return {
     ...metrics,
@@ -300,9 +338,6 @@ export async function fetchStats(rawUrl: string, includeCover = true): Promise<F
     // The page itself supplied numbers, so a missing stats service is not an error
     error: gotPageNumbers ? undefined : metrics.error,
     account: metrics.account ?? metadata.account,
-    platform:
-      metadata.platform === 'ig-reel'
-        ? metadata.platform
-        : metrics.platform ?? metadata.platform,
+    platform,
   }
 }
